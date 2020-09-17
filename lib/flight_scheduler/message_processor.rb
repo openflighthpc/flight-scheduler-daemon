@@ -1,4 +1,3 @@
-# frozen_string_literal: true
 #==============================================================================
 # Copyright (C) 2020-present Alces Flight Ltd.
 #
@@ -26,9 +25,41 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-source "https://rubygems.org"
+module FlightScheduler
+  #
+  # Process incoming messages and send responses.
+  #
+  class MessageProcessor
+    def initialize(connection)
+      @connection = connection
+    end
 
-gem 'concurrent-ruby', require: 'concurrent'
-gem 'daemons'
-gem 'async-process'
-gem 'async-websocket'
+    def call(message)
+      Async.logger.info("Processing message #{message.inspect}")
+      command = message.first
+      case command
+
+      when 'JOB_ALLOCATED'
+        _, job_id, script, arguments = message
+        Async.logger.info("Running job:#{job_id} script:#{script} arguments:#{arguments}")
+        begin
+          FlightScheduler::JobRunner.run_job(job_id, script, *arguments)
+        rescue
+          Async.logger.info("Error running job #{job_id} #{$!.message}")
+          @connection.write(['NODE_FAILED_JOB', job_id])
+          @connection.flush
+        else
+          Async.logger.info("Completed job #{job_id}")
+          @connection.write(['NODE_COMPLETED_JOB', job_id])
+          @connection.flush
+        end
+
+      else
+        Async.logger.info("Unknown message #{message}")
+      end
+      Async.logger.debug("Processed message #{message.inspect}")
+    rescue
+      Async.logger.warn("Error processing message #{$!.message}")
+    end
+  end
+end

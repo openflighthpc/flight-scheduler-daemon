@@ -27,12 +27,16 @@
 
 module FlightScheduler
   autoload(:Application, 'flight_scheduler/application')
-  autoload(:API, 'flight_scheduler/api')
+  autoload(:MessageProcessor, 'flight_scheduler/message_processor')
+  autoload(:JobRegistry, 'flight_scheduler/job_registry')
+  autoload(:JobRunner, 'flight_scheduler/job_runner')
 
   VERSION = "0.0.1"
 
   def app
-    @app ||= Application.new
+    @app ||= Application.new(
+      job_registry: JobRegistry.new,
+    )
   end
   module_function :app
 end

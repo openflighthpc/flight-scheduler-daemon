@@ -1,4 +1,3 @@
-# frozen_string_literal: true
 #==============================================================================
 # Copyright (C) 2020-present Alces Flight Ltd.
 #
@@ -26,9 +25,33 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-source "https://rubygems.org"
+require 'concurrent'
 
-gem 'concurrent-ruby', require: 'concurrent'
-gem 'daemons'
-gem 'async-process'
-gem 'async-websocket'
+module FlightScheduler
+  #
+  # Maintains a mapping from job id to subprocess.
+  #
+  # The mapping can be used to gain a reference to the job's process in order
+  # to check its state or kill it.
+  #
+  # Adding and removing a entry is thread safe.
+  #
+  class JobRegistry
+    class DuplicateJob < RuntimeError; end
+
+    def initialize
+      @jobs = Concurrent::Hash.new
+    end
+
+    def add(job_id, process)
+      if @jobs[job_id]
+        raise DuplicateJob, job_id
+      end
+      @jobs[job_id] = process
+    end
+
+    def remove(job_id)
+      @jobs.delete(job_id)
+    end
+  end
+end
