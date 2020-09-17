@@ -1,8 +1,8 @@
-# Contributing to FlightSchedulerController
+# Contributing to FlightSchedulerDaemon
 
 :+1::tada: Thanks for taking the time to contribute! :tada::+1:
 
-You want to contribute to FlightSchedulerController? Welcome! Please read this
+You want to contribute to FlightSchedulerDaemon? Welcome! Please read this
 document to understand what you can do:
 
  * [Code of Conduct](#code-of-conduct)
@@ -27,12 +27,12 @@ behaviour to [help@openflighthpc.org](mailto:help@openflighthpc.org).
 
 ## Help Others
 
-You can help FlightSchedulerController by helping others who use it and need support.
+You can help FlightSchedulerDaemon by helping others who use it and need support.
 
 ## Analyse Issues
 
 Analysing issue reports can be a lot of effort. Any help is welcome!
-Go to [the GitHub issue tracker](https://github.com/openflighthpc/flight-scheduler-controller/issues?state=open)
+Go to [the GitHub issue tracker](https://github.com/openflighthpc/flight-scheduler-daemon/issues?state=open)
 and find an open issue which needs additional work or a bugfix
 (e.g. issues labeled with "help wanted" or "bug").
 
@@ -42,13 +42,13 @@ even find and [contribute](#contribute-changes) a bugfix?
 
 ## Report an Issue
 
-If you find a bug - behaviour of FlightSchedulerController code or documentation
+If you find a bug - behaviour of FlightSchedulerDaemon code or documentation
 contradicting your expectation - you are welcome to report it. We can
 only handle well-reported, actual bugs, so please follow the
 guidelines below.
 
 Once you have familiarised with the guidelines, you can go to the
-[GitHub issue tracker for FlightSchedulerController](https://github.com/openflighthpc/flight-scheduler-controller/issues/new)
+[GitHub issue tracker for FlightSchedulerDaemon](https://github.com/openflighthpc/flight-scheduler-daemon/issues/new)
 to report the issue.
 
 ### Quick Checklist for Bug Reports
@@ -79,13 +79,13 @@ before it can be exploited.  Please send the related information to
 
 ### Issue Reporting Disclaimer
 
-We want to improve the quality of FlightSchedulerController and good bug reports are
+We want to improve the quality of FlightSchedulerDaemon and good bug reports are
 welcome! However, our capacity is limited, thus we reserve the right
 to close or to not process bug reports with insufficient detail in
 favour of those which are very cleanly documented and easy to
 reproduce. Even though we would like to solve each well-documented
 issue, there is always the chance that it will not happen - remember:
-FlightSchedulerController is Open Source and comes without warranty.
+FlightSchedulerDaemon is Open Source and comes without warranty.
 
 Bug report analysis support is very welcome! (e.g. pre-analysis or
 proposing solutions)
@@ -93,7 +93,7 @@ proposing solutions)
 ## Contribute Changes
 
 You are welcome to contribute code, content or documentation to
-FlightSchedulerController in order to fix bugs or to implement new features.
+FlightSchedulerDaemon in order to fix bugs or to implement new features.
 
 There are three important things to know:
 
@@ -103,7 +103,7 @@ There are three important things to know:
    projects.
 2. **Not all proposed contributions can be accepted**. Some features
    may e.g. just fit a third-party add-on better. The change must fit
-   the overall direction of FlightSchedulerController and really improve it. The more
+   the overall direction of FlightSchedulerDaemon and really improve it. The more
    effort you invest, the better you should clarify in advance whether
    the contribution fits: the best way would be to just open an issue
    to discuss the feature you plan to implement (make it clear you
@@ -114,11 +114,11 @@ There are three important things to know:
 When you contribute (code, documentation, or anything else), you have
 to be aware that your contribution is covered by the same [Eclipse
 Public License 2.0](https://opensource.org/licenses/EPL-2.0) that is
-applied to FlightSchedulerController itself.
+applied to FlightSchedulerDaemon itself.
 
 In particular you need to agree to the Contributor License Agreement,
 which can be [found
-here](https://www.clahub.com/agreements/openflighthpc/flight-scheduler-controller). This
+here](https://www.clahub.com/agreements/openflighthpc/flight-scheduler-daemon). This
 applies to all contributors, including those contributing on behalf of
 a company. If you agree to its content, you simply have to click on
 the link posted by the CLA assistant available on the pull
@@ -152,7 +152,7 @@ the CLA in the meantime.
    and accept it, as described in detail above.
 8. Wait for our code review and approval, possibly enhancing your
    change on request.
-    - Note that the FlightSchedulerController developers also have their regular
+    - Note that the FlightSchedulerDaemon developers also have their regular
       duties, so depending on the required effort for reviewing,
       testing and clarification this may take a while.
 9. Once the change has been approved we will inform you in a comment.
