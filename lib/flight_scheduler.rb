@@ -1,4 +1,3 @@
-# frozen_string_literal: true
 #==============================================================================
 # Copyright (C) 2020-present Alces Flight Ltd.
 #
@@ -26,7 +25,22 @@
 # https://github.com/openflighthpc/flight-scheduler-controller
 #==============================================================================
 
-source "https://rubygems.org"
+module FlightScheduler
+  autoload(:Application, 'flight_scheduler/application')
+  autoload(:API, 'flight_scheduler/api')
 
-gem 'daemons'
-gem 'async-websocket'
+  VERSION = "0.0.1"
+
+  def app
+    @app ||= Application.new
+  end
+  module_function :app
+
+  def add_lib_to_load_path
+    root = File.expand_path(File.dirname(File.dirname(__FILE__)))
+    lib = File.join(root, 'lib')
+    $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+  end
+  module_function :add_lib_to_load_path
+end
+

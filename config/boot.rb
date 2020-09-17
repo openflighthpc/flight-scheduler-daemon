@@ -1,4 +1,3 @@
-# frozen_string_literal: true
 #==============================================================================
 # Copyright (C) 2020-present Alces Flight Ltd.
 #
@@ -26,7 +25,5 @@
 # https://github.com/openflighthpc/flight-scheduler-controller
 #==============================================================================
 
-source "https://rubygems.org"
-
-gem 'daemons'
-gem 'async-websocket'
+require_relative '../lib/flight_scheduler'
+FlightScheduler.add_lib_to_load_path
