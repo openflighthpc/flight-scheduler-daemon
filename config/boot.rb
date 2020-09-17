@@ -29,3 +29,7 @@ lib = File.expand_path('../lib', __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 require 'flight_scheduler'
+
+# XXX Move this to a configuration or environment object.
+require 'async'
+Async.logger.debug!

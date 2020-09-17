@@ -1,4 +1,3 @@
-# frozen_string_literal: true
 #==============================================================================
 # Copyright (C) 2020-present Alces Flight Ltd.
 #
@@ -26,9 +25,40 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-source "https://rubygems.org"
+require 'async'
+require 'async/process'
 
-gem 'concurrent-ruby', require: 'concurrent'
-gem 'daemons'
-gem 'async-process'
-gem 'async-websocket'
+module FlightScheduler
+  #
+  # Run the given job script and save a reference to it in the job registry.
+  #
+  # Current limitations:
+  #
+  # * The environment is not cleaned up before execution.
+  # * The environment is not set according to the options given to the
+  #   scheduler.
+  # * The job output is not saved to disk.
+  #
+  module JobRunner
+    extend self
+
+    def run_job(job_id, *arguments, **options)
+      input, output = Async::IO.pipe
+      options[:out] = output.io
+      child = Async::Process::Child.new(*arguments, **options)
+      FlightScheduler.app.job_registry.add(job_id, child)
+      runner = Async do
+        child.wait
+      ensure
+        output.close
+      end
+      Sync do
+        input.read
+      ensure
+        runner.wait
+        input.close
+        FlightScheduler.app.job_registry.remove(job_id)
+      end
+    end
+  end
+end

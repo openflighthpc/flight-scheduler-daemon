@@ -33,36 +33,16 @@ PORT = ENV.fetch('FLIGHT_SCHEDULER_DAEMON_PORT', 6307)
 URL = "http://127.0.0.1:#{PORT}/v0/ws"
 NODE = 'node01'
 
-class MessageProcessor
-  def initialize(connection)
-    @connection = connection
-  end
-
-  def call(message)
-    Async.logger.info("Processing message #{message.inspect}")
-    command = message.first
-    case command
-
-    when 'JOB_ALLOCATED'
-      _, job_id, script, arguments = message
-      Async.logger.info("Running job:#{job_id} script:#{script} arguments:#{arguments}")
-      sleep 2
-      Async.logger.info("Job #{job_id} completed")
-      @connection.write(['NODE_COMPLETED_JOB', job_id])
-      @connection.flush
-
-    else
-      Async.logger.info("Unknown message #{message}")
-    end
-  rescue
-    Async.logger.info("Error processing message #{$!.message}")
-  end
-end
-
 module FlightScheduler
   # Class to store configuration and provide a singleton resource to lookup
   # that configuration.  Similar in nature to `Rails.app`.
   class Application
+    attr_reader :job_registry
+
+    def initialize(job_registry:)
+      @job_registry = job_registry
+    end
+
     def run
       Async do |task|
         endpoint = Async::HTTP::Endpoint.parse(URL)
