@@ -29,7 +29,8 @@ require 'async'
 require 'async/http/endpoint'
 require 'async/websocket/client'
 
-URL = "http://127.0.0.1:9292/v0/ws"
+PORT = ENV.fetch('FLIGHT_SCHEDULER_DAEMON_PORT', 6307)
+URL = "http://127.0.0.1:#{PORT}/v0/ws"
 NODE = 'node01'
 
 class MessageProcessor
