@@ -25,5 +25,7 @@
 # https://github.com/openflighthpc/flight-scheduler-controller
 #==============================================================================
 
-require_relative '../lib/flight_scheduler'
-FlightScheduler.add_lib_to_load_path
+lib = File.expand_path('../lib', __dir__)
+$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+
+require 'flight_scheduler'

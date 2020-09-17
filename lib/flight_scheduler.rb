@@ -35,12 +35,5 @@ module FlightScheduler
     @app ||= Application.new
   end
   module_function :app
-
-  def add_lib_to_load_path
-    root = File.expand_path(File.dirname(File.dirname(__FILE__)))
-    lib = File.join(root, 'lib')
-    $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-  end
-  module_function :add_lib_to_load_path
 end
 
