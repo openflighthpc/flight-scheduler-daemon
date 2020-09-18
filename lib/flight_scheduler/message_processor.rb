@@ -40,10 +40,17 @@ module FlightScheduler
       case command
 
       when 'JOB_ALLOCATED'
-        job_id, script, arguments = message[:job_id], message[:script], message[:arguments]
+        job_id    = message[:job_id]
+        script    = message[:script]
+        arguments = message[:arguments]
+        # Ensure env is indeed a hash otherwise all sorts of weirdness will
+        # break loose in Process.spawn
+        env       = message[:environment].to_h
+
         Async.logger.info("Running job:#{job_id} script:#{script} arguments:#{arguments}")
+        Async.logger.debug("Environment: #{env.map { |k, v| "#{k}=#{v}" }.join("\n")}")
         begin
-          task = FlightScheduler::JobRunner.run_job(job_id, script, *arguments)
+          task = FlightScheduler::JobRunner.run_job(job_id, env, script, *arguments, unsetenv_others: true)
         rescue
           Async.logger.info("Error running job #{job_id} #{$!.message}")
           @connection.write({command: 'NODE_FAILED_JOB', job_id: job_id})
