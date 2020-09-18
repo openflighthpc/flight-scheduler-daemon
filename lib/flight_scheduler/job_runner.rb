@@ -37,28 +37,17 @@ module FlightScheduler
   # * The environment is not cleaned up before execution.
   # * The environment is not set according to the options given to the
   #   scheduler.
-  # * The job output is not saved to disk.
+  # * The job's standard and error output is not saved to disk.
   #
   module JobRunner
     extend self
 
     def run_job(job_id, *arguments, **options)
-      input, output = Async::IO.pipe
-      options[:out] = output.io
       child = Async::Process::Child.new(*arguments, **options)
       FlightScheduler.app.job_registry.add(job_id, child)
-      runner = Async do
-        child.wait
-      ensure
-        output.close
-      end
-      Sync do
-        input.read
-      ensure
-        runner.wait
-        input.close
-        FlightScheduler.app.job_registry.remove(job_id)
-      end
+      child.wait
+    ensure
+      FlightScheduler.app.job_registry.remove(job_id)
     end
   end
 end
