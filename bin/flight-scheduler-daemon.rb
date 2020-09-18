@@ -26,8 +26,6 @@
 # https://github.com/alces-flight/flight-scheduler-daemon
 #==============================================================================
 begin
-  # lib_dir = File.expand_path(File.join(__FILE__, '../../lib'))
-  # $LOAD_PATH << lib_dir
   ENV['BUNDLE_GEMFILE'] ||= File.join(__FILE__, '../../Gemfile')
 
   require 'rubygems'
@@ -41,7 +39,32 @@ begin
   OpenFlight.set_standard_env rescue nil
 
   require 'daemons'
-  Daemons.run_proc('flight-scheduler-daemon') do
+  options = {
+    # Passing ARGV allows the below options to be overridden on the command
+    # line.
+    ARGV: ARGV,
+
+    # The below settings are suitable for development a production
+    # installation would likely want to override them.
+
+    # The relative path to the directory to store the pid file.  The path is
+    # relative to the current working directory.  An absolute path can be
+    # given instead.
+    dir: ENV.fetch('PID_DIR', 'tmp'),
+    dir_mode: :normal,
+
+    # The absolute path to the directory to store the logs.  Note, relative
+    # paths do not work here.
+    log_dir: File.expand_path(File.join(__FILE__, '../../log')),
+
+    # Redirect stdout and stderr to the file given by `output_logfilename`.
+    log_output: true,
+
+    # The name of the log file.  It will be created in the directory given by
+    # `log_dir`.
+    output_logfilename: 'flight-scheduler-daemon.log',
+  }
+  Daemons.run_proc('flight-scheduler-daemon', **options) do
     FlightScheduler.app.run
   end
 rescue Interrupt
