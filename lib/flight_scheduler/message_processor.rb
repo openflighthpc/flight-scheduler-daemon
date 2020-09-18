@@ -58,6 +58,13 @@ module FlightScheduler
           end
         end
 
+      when 'JOB_CANCELLED'
+        job_id = message[:job_id]
+        Async.logger.info("Cancelling job:#{job_id}")
+        FlightScheduler::JobRunner.cancel_job(job_id)
+        # The JOB_ALLOCATED task will report back that the process has failed.
+        # We don't need to send any messages to the controller here.
+
       else
         Async.logger.info("Unknown message #{message}")
       end

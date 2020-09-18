@@ -60,5 +60,21 @@ module FlightScheduler
         FlightScheduler.app.job_registry.remove(job_id)
       end
     end
+
+    # Kills the subprocess associated with the given job id if one exists.
+    #
+    # Invariants:
+    #
+    # * Returns an Async::Task that can be `wait`ed on.  When the returned
+    #   task has completed, the subprocess will have been sent a `TERM`
+    #   signal.
+    def cancel_job(job_id)
+      process = FlightScheduler.app.job_registry[job_id]
+      if process && process.running?
+        Async do
+          process.kill
+        end
+      end
+    end
   end
 end

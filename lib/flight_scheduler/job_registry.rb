@@ -53,5 +53,9 @@ module FlightScheduler
     def remove(job_id)
       @jobs.delete(job_id)
     end
+
+    def [](job_id)
+      @jobs[job_id]
+    end
   end
 end
