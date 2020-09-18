@@ -43,15 +43,19 @@ module FlightScheduler
         job_id, script, arguments = message[:job_id], message[:script], message[:arguments]
         Async.logger.info("Running job:#{job_id} script:#{script} arguments:#{arguments}")
         begin
-          FlightScheduler::JobRunner.run_job(job_id, script, *arguments)
+          task = FlightScheduler::JobRunner.run_job(job_id, script, *arguments)
         rescue
           Async.logger.info("Error running job #{job_id} #{$!.message}")
           @connection.write({command: 'NODE_FAILED_JOB', job_id: job_id})
           @connection.flush
         else
-          Async.logger.info("Completed job #{job_id}")
-          @connection.write({command: 'NODE_COMPLETED_JOB', job_id: job_id})
-          @connection.flush
+          Async do
+            status = task.wait
+            Async.logger.info("Completed job #{job_id}")
+            command = status.exitstatus == 0 ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
+            @connection.write({command: command, job_id: job_id})
+            @connection.flush
+          end
         end
 
       else

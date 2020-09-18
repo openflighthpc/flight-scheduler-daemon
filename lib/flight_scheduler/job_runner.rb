@@ -42,12 +42,23 @@ module FlightScheduler
   module JobRunner
     extend self
 
+    # Run the given arguments in a subprocess and return an Async::Task.
+    #
+    # Invariants:
+    #
+    # * Blocks until the subprocess has been registered with the job registry.
+    #
+    # * Returns an Async::Task that can be `wait`ed on.  When the returned
+    #   task has completed, the subprocess has completed and is no longer in
+    #   the job registry.
     def run_job(job_id, *arguments, **options)
       child = Async::Process::Child.new(*arguments, **options)
       FlightScheduler.app.job_registry.add(job_id, child)
-      child.wait
-    ensure
-      FlightScheduler.app.job_registry.remove(job_id)
+      Async do
+        child.wait
+      ensure
+        FlightScheduler.app.job_registry.remove(job_id)
+      end
     end
   end
 end
