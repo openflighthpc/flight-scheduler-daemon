@@ -52,7 +52,7 @@ module FlightScheduler
           Async::WebSocket::Client.connect(endpoint) do |connection|
             Async.logger.info("Connected to #{URL.inspect}")
             processor = MessageProcessor.new(connection)
-            connection.write ["CONNECTED", NODE]
+            connection.write({ command: "CONNECTED", node: NODE })
             connection.flush
             while message = connection.read
               processor.call(message)

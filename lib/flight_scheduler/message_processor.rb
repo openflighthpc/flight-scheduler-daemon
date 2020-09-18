@@ -36,21 +36,21 @@ module FlightScheduler
 
     def call(message)
       Async.logger.info("Processing message #{message.inspect}")
-      command = message.first
+      command = message[:command]
       case command
 
       when 'JOB_ALLOCATED'
-        _, job_id, script, arguments = message
+        job_id, script, arguments = message[:job_id], message[:script], message[:arguments]
         Async.logger.info("Running job:#{job_id} script:#{script} arguments:#{arguments}")
         begin
           FlightScheduler::JobRunner.run_job(job_id, script, *arguments)
         rescue
           Async.logger.info("Error running job #{job_id} #{$!.message}")
-          @connection.write(['NODE_FAILED_JOB', job_id])
+          @connection.write({command: 'NODE_FAILED_JOB', job_id: job_id})
           @connection.flush
         else
           Async.logger.info("Completed job #{job_id}")
-          @connection.write(['NODE_COMPLETED_JOB', job_id])
+          @connection.write({command: 'NODE_COMPLETED_JOB', job_id: job_id})
           @connection.flush
         end
 
