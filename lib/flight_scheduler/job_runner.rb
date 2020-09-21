@@ -72,7 +72,7 @@ module FlightScheduler
         FlightScheduler.app.job_registry.remove(job_id)
       end
     ensure
-      FileUtils.rm_f script_path unless script_path.nil?
+      FileUtils.rm_rf File.dirname(script_path) unless script_path.nil?
     end
 
     # Kills the subprocess associated with the given job id if one exists.
