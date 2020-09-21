@@ -51,8 +51,8 @@ module FlightScheduler
     # * Returns an Async::Task that can be `wait`ed on.  When the returned
     #   task has completed, the subprocess has completed and is no longer in
     #   the job registry.
-    def run_job(job_id, *arguments, **options)
-      child = Async::Process::Child.new(*arguments, **options)
+    def run_job(job_id, env, *arguments, **options)
+      child = Async::Process::Child.new(env, *arguments, **options)
       FlightScheduler.app.job_registry.add(job_id, child)
       Async do
         child.wait
