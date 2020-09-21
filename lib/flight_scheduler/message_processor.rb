@@ -30,10 +30,6 @@ module FlightScheduler
   # Process incoming messages and send responses.
   #
   class MessageProcessor
-    def self.script_dir
-      File.expand_path('../../var/spool/state', __dir__)
-    end
-
     def initialize(connection)
       @connection = connection
     end
@@ -53,11 +49,8 @@ module FlightScheduler
 
         Async.logger.info("Running job:#{job_id} script:#{script} arguments:#{arguments}")
         Async.logger.debug("Environment: #{env.map { |k, v| "#{k}=#{v}" }.join("\n")}")
-        script_path = File.join(self.class.script_dir, job_id, 'job-script')
         begin
-          FileUtils.mkdir_p File.basename(script_path)
-          FileUtils.write script_path, script
-          task = FlightScheduler::JobRunner.run_job(job_id, env, script_path, *arguments, unsetenv_others: true)
+          task = FlightScheduler::JobRunner.run_job(job_id, env, script, *arguments, unsetenv_others: true)
         rescue
           Async.logger.info("Error running job #{job_id} #{$!.message}")
           @connection.write({command: 'NODE_FAILED_JOB', job_id: job_id})
@@ -70,8 +63,6 @@ module FlightScheduler
             @connection.write({command: command, job_id: job_id})
             @connection.flush
           end
-        ensure
-          FileUtils.rm_f script_path
         end
 
       when 'JOB_CANCELLED'

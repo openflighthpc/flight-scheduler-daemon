@@ -42,6 +42,11 @@ module FlightScheduler
   module JobRunner
     extend self
 
+    def script_dir
+      File.expand_path('../../var/spool/state', __dir__)
+    end
+
+
     # Run the given arguments in a subprocess and return an Async::Task.
     #
     # Invariants:
@@ -51,14 +56,23 @@ module FlightScheduler
     # * Returns an Async::Task that can be `wait`ed on.  When the returned
     #   task has completed, the subprocess has completed and is no longer in
     #   the job registry.
-    def run_job(job_id, env, *arguments, **options)
-      child = Async::Process::Child.new(env, *arguments, **options)
+    def run_job(job_id, env, script_body, *arguments, **options)
+      # Write the script_body to disk
+      script_path = File.join(script_dir, job_id, 'job-script')
+      FileUtils.mkdir_p File.dirname(script_path)
+      File.write script_path, script_body
+      FileUtils.chmod 0755, script_path
+
+      # Run the script
+      child = Async::Process::Child.new(env, script_path, *arguments, **options)
       FlightScheduler.app.job_registry.add(job_id, child)
       Async do
         child.wait
       ensure
         FlightScheduler.app.job_registry.remove(job_id)
       end
+    ensure
+      FileUtils.rm_f script_path unless script_path.nil?
     end
 
     # Kills the subprocess associated with the given job id if one exists.
