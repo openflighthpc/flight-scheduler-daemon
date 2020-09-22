@@ -60,6 +60,34 @@ module FlightScheduler
       true
     end
 
+    # Validates the struct before executing the command
+    # TODO: Make the error more informative
+    def run!
+      raise JobValidationError, <<~ERROR.chomp unless valid?
+        An unexpected error has occurred! The job does not appear to be in a valid state.
+      ERROR
+
+      run
+    end
+
+    # Kills the subprocess associated with the given job id if one exists.
+    #
+    # Invariants:
+    #
+    # * Returns an Async::Task that can be `wait`ed on.  When the returned
+    #   task has completed, the subprocess will have been sent a `TERM`
+    #   signal.
+    def cancel
+      process = FlightScheduler.app.job_registry[job_id]
+      if process && process.running?
+        Async do
+          process.kill
+        end
+      end
+    end
+
+    private
+
     # Run the given arguments in a subprocess and return an Async::Task.
     #
     # Invariants:
@@ -86,22 +114,6 @@ module FlightScheduler
       end
     ensure
       FileUtils.rm_rf File.dirname(script_path) unless script_path.nil?
-    end
-
-    # Kills the subprocess associated with the given job id if one exists.
-    #
-    # Invariants:
-    #
-    # * Returns an Async::Task that can be `wait`ed on.  When the returned
-    #   task has completed, the subprocess will have been sent a `TERM`
-    #   signal.
-    def cancel
-      process = FlightScheduler.app.job_registry[job_id]
-      if process && process.running?
-        Async do
-          process.kill
-        end
-      end
     end
   end
 end
