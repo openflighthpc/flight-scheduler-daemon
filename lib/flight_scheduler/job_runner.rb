@@ -40,7 +40,7 @@ module FlightScheduler
   #   scheduler.
   # * The job's standard and error output is not saved to disk.
   #
-  JobRunner = Struct.new(:id, :env, :script_body, :arguments) do
+  JobRunner = Struct.new(:id, :envs, :script_body, :arguments) do
     attr_accessor :child, :task
 
     extend Forwardable
@@ -58,7 +58,7 @@ module FlightScheduler
     # This is to prevent rogue data being passed Process.spawn or rm -f
     def valid?
       return false unless /\A[\w-]+\Z/.match? id
-      return false unless env.is_a? Hash
+      return false unless envs.is_a? Hash
       return false unless arguments.is_a? Array
       true
     end
@@ -84,6 +84,9 @@ module FlightScheduler
         An unexpected error has occurred! The job does not appear to be in a valid state.
       ERROR
 
+      # Ensures env's is a stringified hash
+      string_envs = envs.map { |k, v| [k.to_s, v] }.to_h
+
       # Add the job to the registry
       path = build_script_path
       FlightScheduler.app.job_registry.add(id, self)
@@ -95,7 +98,7 @@ module FlightScheduler
         FileUtils.chmod 0755, path
 
         # Starts the child process
-        self.child = Async::Process::Child.new(env, path, *arguments, unsetenv_others: true)
+        self.child = Async::Process::Child.new(string_envs, path, *arguments, unsetenv_others: true)
         child.wait
       ensure
         FlightScheduler.app.job_registry.remove(id)
