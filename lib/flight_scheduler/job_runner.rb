@@ -27,6 +27,7 @@
 
 require 'async'
 require 'async/process'
+require 'forwardable'
 
 module FlightScheduler
   #
@@ -39,25 +40,70 @@ module FlightScheduler
   #   scheduler.
   # * The job's standard and error output is not saved to disk.
   #
-  module JobRunner
-    extend self
+  JobRunner = Struct.new(:id, :envs, :script_body, :arguments) do
+    attr_accessor :child, :task, :status
+
+    extend Forwardable
+    def_delegator :task, :wait
+
+    def self.script_dir
+      File.expand_path('../../var/spool/state', __dir__)
+    end
+
+    def build_script_path
+      File.join(self.class.script_dir, id, 'job-script')
+    end
+
+    # Checks the various parameters are in the correct format before running
+    # This is to prevent rogue data being passed Process.spawn or rm -f
+    def valid?
+      return false unless /\A[\w-]+\Z/.match? id
+      return false unless envs.is_a? Hash
+      return false unless arguments.is_a? Array
+      true
+    end
+
+    # Checks if the child process has exited correctly
+    def success?
+      return nil unless status
+      status.success?
+    end
 
     # Run the given arguments in a subprocess and return an Async::Task.
     #
     # Invariants:
     #
-    # * Blocks until the subprocess has been registered with the job registry.
+    # * Blocks until the job has been validated and recorded in the registry
     #
     # * Returns an Async::Task that can be `wait`ed on.  When the returned
     #   task has completed, the subprocess has completed and is no longer in
     #   the job registry.
-    def run_job(job_id, env, *arguments, **options)
-      child = Async::Process::Child.new(env, *arguments, **options)
-      FlightScheduler.app.job_registry.add(job_id, child)
-      Async do
-        child.wait
+    def run
+      raise JobValidationError, <<~ERROR.chomp unless valid?
+        An unexpected error has occurred! The job does not appear to be in a valid state.
+      ERROR
+
+      # Ensures env's is a stringified hash
+      string_envs = envs.map { |k, v| [k.to_s, v] }.to_h
+
+      # Add the job to the registry
+      path = build_script_path
+      FlightScheduler.app.job_registry.add(id, self)
+
+      self.task = Async do
+        # Write the script_body to disk
+        FileUtils.mkdir_p File.dirname(path)
+        Async::IO::Stream.open(path, 'w') do |stream|
+          stream.write(script_body)
+        end
+        FileUtils.chmod 0755, path
+
+        # Starts the child process
+        self.child = Async::Process::Child.new(string_envs, path, *arguments, unsetenv_others: true)
+        self.status = self.child.wait
       ensure
-        FlightScheduler.app.job_registry.remove(job_id)
+        FlightScheduler.app.job_registry.remove(id)
+        FileUtils.rm_rf File.dirname(path)
       end
     end
 
@@ -68,11 +114,10 @@ module FlightScheduler
     # * Returns an Async::Task that can be `wait`ed on.  When the returned
     #   task has completed, the subprocess will have been sent a `TERM`
     #   signal.
-    def cancel_job(job_id)
-      process = FlightScheduler.app.job_registry[job_id]
-      if process && process.running?
+    def cancel
+      if child && child.running?
         Async do
-          process.kill
+          child.kill
         end
       end
     end

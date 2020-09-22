@@ -25,37 +25,7 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-require 'concurrent'
-
 module FlightScheduler
-  #
-  # Maintains a mapping from job id to subprocess.
-  #
-  # The mapping can be used to gain a reference to the job's process in order
-  # to check its state or kill it.
-  #
-  # Adding and removing a entry is thread safe.
-  #
-  class JobRegistry
-    class DuplicateJob < RuntimeError; end
-
-    def initialize
-      @jobs = Concurrent::Hash.new
-    end
-
-    def add(id, job)
-      if @jobs[id]
-        raise DuplicateJob, id
-      end
-      @jobs[id] = job
-    end
-
-    def remove(id)
-      @jobs.delete(id)
-    end
-
-    def [](id)
-      @jobs[id]
-    end
-  end
+  class BaseErrors < RuntimeError; end
+  class JobValidationError < BaseError; end
 end

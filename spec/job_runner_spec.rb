@@ -25,37 +25,48 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-require 'concurrent'
+require 'spec_helper'
+require 'securerandom'
 
-module FlightScheduler
-  #
-  # Maintains a mapping from job id to subprocess.
-  #
-  # The mapping can be used to gain a reference to the job's process in order
-  # to check its state or kill it.
-  #
-  # Adding and removing a entry is thread safe.
-  #
-  class JobRegistry
-    class DuplicateJob < RuntimeError; end
+RSpec.describe FlightScheduler::JobRunner do
+  let(:job_id) { SecureRandom.uuid }
+  let(:env) { {} }
+  let(:script_body) do
+    <<~SCRIPT
+      #!/bin/bash
+      echo 'test'
+    SCRIPT
+  end
+  let(:arguments) { [] }
 
-    def initialize
-      @jobs = Concurrent::Hash.new
-    end
+  subject do
+    described_class.new(job_id, env, script_body, arguments)
+  end
 
-    def add(id, job)
-      if @jobs[id]
-        raise DuplicateJob, id
-      end
-      @jobs[id] = job
-    end
+  it { should be_valid }
 
-    def remove(id)
-      @jobs.delete(id)
-    end
+  context 'with a nil job_id' do
+    let(:job_id) { nil }
 
-    def [](id)
-      @jobs[id]
-    end
+    it { should_not be_valid }
+  end
+
+  context 'with a file path as the job_id' do
+    let(:job_id) { '../../../../../../../root' }
+
+    it { should_not be_valid }
+  end
+
+  context 'with a script as the env' do
+    let(:env) { '/usr/sbin/shutdown' }
+
+    it { should_not be_valid }
+  end
+
+  context 'with a string as arrguments' do
+    let(:arguments) { 'adds-nice-handling-to-internal-errors' }
+
+    it { should_not be_valid }
   end
 end
+
