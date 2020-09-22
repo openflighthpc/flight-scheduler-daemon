@@ -117,7 +117,7 @@ module FlightScheduler
     def cancel
       if child && child.running?
         Async do
-          process.kill
+          child.kill
         end
       end
     end
