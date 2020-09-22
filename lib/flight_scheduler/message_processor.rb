@@ -56,9 +56,9 @@ module FlightScheduler
           @connection.flush
         else
           Async do
-            status = job.task.wait
+            job.wait
             Async.logger.info("Completed job #{job_id}")
-            command = status.exitstatus == 0 ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
+            command = job.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
             @connection.write({command: command, job_id: job_id})
             @connection.flush
           end
