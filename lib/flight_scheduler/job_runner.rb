@@ -55,6 +55,7 @@ module FlightScheduler
     # This is to prevent rogue data being passed Process.spawn or rm -f
     def valid?
       return false unless /\A[\w-]+\Z/.match? job_id
+      return false unless env.is_a? Hash
       true
     end
 

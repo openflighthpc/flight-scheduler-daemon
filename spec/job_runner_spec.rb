@@ -56,5 +56,11 @@ RSpec.describe FlightScheduler::JobRunner do
 
     it { should_not be_valid }
   end
+
+  context 'with a script as the env' do
+    let(:env) { '/usr/sbin/shutdown' }
+
+    it { should_not be_valid }
+  end
 end
 
