@@ -56,6 +56,7 @@ module FlightScheduler
     def valid?
       return false unless /\A[\w-]+\Z/.match? job_id
       return false unless env.is_a? Hash
+      return false unless arguments.is_a? Array
       true
     end
 

@@ -62,5 +62,11 @@ RSpec.describe FlightScheduler::JobRunner do
 
     it { should_not be_valid }
   end
+
+  context 'with a string as arrguments' do
+    let(:arguments) { 'adds-nice-handling-to-internal-errors' }
+
+    it { should_not be_valid }
+  end
 end
 
