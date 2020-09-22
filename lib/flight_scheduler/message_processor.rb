@@ -50,14 +50,15 @@ module FlightScheduler
         Async.logger.info("Running job:#{job_id} script:#{script} arguments:#{arguments}")
         Async.logger.debug("Environment: #{env.map { |k, v| "#{k}=#{v}" }.join("\n")}")
         begin
-          task = FlightScheduler::JobRunner.run_job(job_id, env, script, *arguments, unsetenv_others: true)
+          job = FlightScheduler::JobRunner.new(job_id, env, script, arguments)
+          job.run
         rescue
           Async.logger.info("Error running job #{job_id} #{$!.message}")
           @connection.write({command: 'NODE_FAILED_JOB', job_id: job_id})
           @connection.flush
         else
           Async do
-            status = task.wait
+            status = job.task.wait
             Async.logger.info("Completed job #{job_id}")
             command = status.exitstatus == 0 ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
             @connection.write({command: command, job_id: job_id})
@@ -68,7 +69,7 @@ module FlightScheduler
       when 'JOB_CANCELLED'
         job_id = message[:job_id]
         Async.logger.info("Cancelling job:#{job_id}")
-        FlightScheduler::JobRunner.cancel_job(job_id)
+        FlightScheduler.app.job_registry[job_id].cancel
         # The JOB_ALLOCATED task will report back that the process has failed.
         # We don't need to send any messages to the controller here.
 

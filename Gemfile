@@ -32,3 +32,7 @@ gem 'concurrent-ruby', require: 'concurrent'
 gem 'daemons'
 gem 'async-process'
 gem 'async-websocket'
+
+group :test do
+  gem 'rspec'
+end

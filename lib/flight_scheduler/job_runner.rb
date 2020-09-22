@@ -39,13 +39,23 @@ module FlightScheduler
   #   scheduler.
   # * The job's standard and error output is not saved to disk.
   #
-  module JobRunner
-    extend self
+  JobRunner = Struct.new(:id, :env, :script_body, :arguments) do
+    attr_accessor :child, :task
 
-    def script_dir
+    def self.script_dir
       File.expand_path('../../var/spool/state', __dir__)
     end
 
+    # DEPRECATED: Use id
+    def job_id
+      id
+    end
+
+    # Checks the various parameters are in the correct format before running
+    # This is to prevent rogue data being passed Process.spawn or rm -f
+    def valid?
+      true
+    end
 
     # Run the given arguments in a subprocess and return an Async::Task.
     #
@@ -56,17 +66,17 @@ module FlightScheduler
     # * Returns an Async::Task that can be `wait`ed on.  When the returned
     #   task has completed, the subprocess has completed and is no longer in
     #   the job registry.
-    def run_job(job_id, env, script_body, *arguments, **options)
+    def run
       # Write the script_body to disk
-      script_path = File.join(script_dir, job_id, 'job-script')
+      script_path = File.join(self.class.script_dir, job_id, 'job-script')
       FileUtils.mkdir_p File.dirname(script_path)
       File.write script_path, script_body
       FileUtils.chmod 0755, script_path
 
       # Run the script
-      child = Async::Process::Child.new(env, script_path, *arguments, **options)
-      FlightScheduler.app.job_registry.add(job_id, child)
-      Async do
+      self.child = Async::Process::Child.new(env, script_path, *arguments, unsetenv_others: true)
+      FlightScheduler.app.job_registry.add(id, self)
+      self.task = Async do
         child.wait
       ensure
         FlightScheduler.app.job_registry.remove(job_id)
@@ -82,7 +92,7 @@ module FlightScheduler
     # * Returns an Async::Task that can be `wait`ed on.  When the returned
     #   task has completed, the subprocess will have been sent a `TERM`
     #   signal.
-    def cancel_job(job_id)
+    def cancel
       process = FlightScheduler.app.job_registry[job_id]
       if process && process.running?
         Async do
