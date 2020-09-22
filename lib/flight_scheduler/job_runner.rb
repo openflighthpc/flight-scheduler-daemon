@@ -51,18 +51,13 @@ module FlightScheduler
     end
 
     def build_script_path
-      File.join(self.class.script_dir, job_id, 'job-script')
-    end
-
-    # DEPRECATED: Use id
-    def job_id
-      id
+      File.join(self.class.script_dir, id, 'job-script')
     end
 
     # Checks the various parameters are in the correct format before running
     # This is to prevent rogue data being passed Process.spawn or rm -f
     def valid?
-      return false unless /\A[\w-]+\Z/.match? job_id
+      return false unless /\A[\w-]+\Z/.match? id
       return false unless env.is_a? Hash
       return false unless arguments.is_a? Array
       true
@@ -103,7 +98,7 @@ module FlightScheduler
         self.child = Async::Process::Child.new(env, path, *arguments, unsetenv_others: true)
         child.wait
       ensure
-        FlightScheduler.app.job_registry.remove(job_id)
+        FlightScheduler.app.job_registry.remove(id)
         FileUtils.rm_rf File.dirname(path)
       end
     end
@@ -116,7 +111,7 @@ module FlightScheduler
     #   task has completed, the subprocess will have been sent a `TERM`
     #   signal.
     def cancel
-      process = FlightScheduler.app.job_registry[job_id]
+      process = FlightScheduler.app.job_registry[id]
       if process && process.running?
         Async do
           process.kill
