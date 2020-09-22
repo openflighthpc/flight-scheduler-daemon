@@ -43,9 +43,7 @@ module FlightScheduler
         job_id    = message[:job_id]
         script    = message[:script]
         arguments = message[:arguments]
-        # Ensure env is indeed a hash otherwise all sorts of weirdness will
-        # break loose in Process.spawn
-        env       = message[:environment].map { |k, v| [k.to_s, v&.to_s] }.to_h
+        env       = message[:environment]
 
         Async.logger.info("Running job:#{job_id} script:#{script} arguments:#{arguments}")
         Async.logger.debug("Environment: #{env.map { |k, v| "#{k}=#{v}" }.join("\n")}")
