@@ -93,7 +93,9 @@ module FlightScheduler
       self.task = Async do
         # Write the script_body to disk
         FileUtils.mkdir_p File.dirname(path)
-        File.write path, script_body
+        Async::IO::Stream.open(path, 'w') do |stream|
+          stream.write(script_body)
+        end
         FileUtils.chmod 0755, path
 
         # Starts the child process
