@@ -75,14 +75,11 @@ module FlightScheduler
       child.success?
     end
 
-    # Validates the struct before executing the command
-    # TODO: Make the error more informative
-    #
     # Run the given arguments in a subprocess and return an Async::Task.
     #
     # Invariants:
     #
-    # * Blocks until the subprocess has been registered with the job registry.
+    # * Blocks until the job has been validated and recorded in the registry
     #
     # * Returns an Async::Task that can be `wait`ed on.  When the returned
     #   task has completed, the subprocess has completed and is no longer in
@@ -92,7 +89,9 @@ module FlightScheduler
         An unexpected error has occurred! The job does not appear to be in a valid state.
       ERROR
 
+      # Add the job to the registry
       path = build_script_path
+      FlightScheduler.app.job_registry.add(id, self)
 
       self.task = Async do
         # Write the script_body to disk
@@ -102,9 +101,6 @@ module FlightScheduler
 
         # Starts the child process
         self.child = Async::Process::Child.new(env, path, *arguments, unsetenv_others: true)
-        FlightScheduler.app.job_registry.add(id, self)
-
-        # Waits for the child asynchronous
         child.wait
       ensure
         FlightScheduler.app.job_registry.remove(job_id)
