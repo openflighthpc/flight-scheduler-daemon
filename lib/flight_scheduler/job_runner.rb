@@ -98,8 +98,7 @@ module FlightScheduler
         FileUtils.chmod 0755, path
 
         # Starts the child process
-        self.child = Async::Process::Child.new(string_envs, path, *arguments, unsetenv_others: true)
-        child.wait
+        self.child = Async::Process::Child.new(string_envs, path, *arguments, unsetenv_others: true).wait
       ensure
         FlightScheduler.app.job_registry.remove(id)
         FileUtils.rm_rf File.dirname(path)
