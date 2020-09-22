@@ -27,6 +27,9 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
+require 'bundler'
+Bundler.require(:development, :test)
+
 require_relative '../config/boot.rb'
 
 RSpec.configure do |config|

@@ -34,5 +34,10 @@ gem 'async-process'
 gem 'async-websocket'
 
 group :test do
+  group :development do
+    gem 'pry'
+    gem 'pry-byebug'
+  end
+
   gem 'rspec'
 end

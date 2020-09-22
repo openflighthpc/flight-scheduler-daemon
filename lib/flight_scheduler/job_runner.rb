@@ -54,6 +54,7 @@ module FlightScheduler
     # Checks the various parameters are in the correct format before running
     # This is to prevent rogue data being passed Process.spawn or rm -f
     def valid?
+      return false unless /\A[\w-]+\Z/.match? job_id
       true
     end
 

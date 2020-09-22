@@ -44,5 +44,17 @@ RSpec.describe FlightScheduler::JobRunner do
   end
 
   it { should be_valid }
+
+  context 'with a nil job_id' do
+    let(:job_id) { nil }
+
+    it { should_not be_valid }
+  end
+
+  context 'with a file path as the job_id' do
+    let(:job_id) { '../../../../../../../root' }
+
+    it { should_not be_valid }
+  end
 end
 
