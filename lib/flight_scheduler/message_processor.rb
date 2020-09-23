@@ -52,14 +52,33 @@ module FlightScheduler
           job.run
         rescue
           Async.logger.info("Error running job #{job_id} #{$!.message}")
-          @connection.write({command: 'NODE_FAILED_JOB', job_id: job_id})
+          if message[:array_job_id]
+            @connection.write({
+              command: 'NODE_FAILED_ARRAY_TASK',
+              array_job_id: message[:array_job_id],
+              array_task_id: message[:array_task_id],
+            })
+          else
+            @connection.write({command: 'NODE_FAILED_JOB', job_id: job_id})
+          end
           @connection.flush
         else
           Async do
             job.wait
             Async.logger.info("Completed job #{job_id}")
-            command = job.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
-            @connection.write({command: command, job_id: job_id})
+            if message[:array_job_id]
+              command = job.success? ?
+                'NODE_COMPLETED_ARRAY_TASK' :
+                'NODE_FAILED_ARRAY_TASK'
+              @connection.write({
+                command: command,
+                array_job_id: message[:array_job_id],
+                array_task_id: message[:array_task_id],
+              })
+            else
+              command = job.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
+              @connection.write({command: command, job_id: job_id})
+            end
             @connection.flush
           end
         end
