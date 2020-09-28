@@ -1,4 +1,3 @@
-# frozen_string_literal: true
 #==============================================================================
 # Copyright (C) 2020-present Alces Flight Ltd.
 #
@@ -26,19 +25,20 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-source "https://rubygems.org"
+# The URL of the flight scheduler controller.
+# Environment variable FLIGHT_SCHEDULER_CONTROLLER_URL takes precedence over
+# this setting.
+# Default: http://127.0.0.1:6307/v0/ws
+# controller_url: http://127.0.0.1:6307/v0/ws
 
-gem 'activesupport', require: 'active_support'
-gem 'async-process'
-gem 'async-websocket'
-gem 'concurrent-ruby', require: 'concurrent'
-gem 'daemons'
+# The name of the node the daemon is running on.
+# Environment variable FLIGHT_SCHEDULER_NODE_NAME takes precedence over this
+# setting.
+# Default: The output from `hostname --short`.
+# node_name: 
 
-group :test do
-  group :development do
-    gem 'pry'
-    gem 'pry-byebug'
-  end
-
-  gem 'rspec'
-end
+# Log level.
+# Environment variable FLIGHT_SCHEDULER_LOG_LEVEL takes precedence over this
+# setting.
+# Default: info
+# log_level: info

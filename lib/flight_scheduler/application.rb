@@ -40,15 +40,12 @@ module FlightScheduler
     end
 
     def config
-      @config ||= Configuration.new
+      @config ||= Configuration.load(root)
     end
-
-    def configure(&block)
-      instance_eval(&block)
-    end
+    alias_method :load_configuration, :config
 
     def root
-      config.root
+      @root ||= Pathname.new(__dir__).join('../../').expand_path
     end
 
     def run
