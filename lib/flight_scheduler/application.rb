@@ -30,7 +30,7 @@ require 'async/http/endpoint'
 require 'async/websocket/client'
 
 URL = ENV.fetch('FLIGHT_SCHEDULER_DAEMON_URL', "http://127.0.0.1:6307/v0/ws")
-NODE = ENV.fetch('FLIGHT_SCHEDULER_DAEMON_NODE', `hostname`.chomp)
+NODE = ENV.fetch('FLIGHT_SCHEDULER_DAEMON_NODE', `hostname --short`.chomp)
 
 module FlightScheduler
   # Class to store configuration and provide a singleton resource to lookup
