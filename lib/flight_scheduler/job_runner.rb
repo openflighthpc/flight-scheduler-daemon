@@ -35,9 +35,6 @@ module FlightScheduler
   #
   # Current limitations:
   #
-  # * The environment is not cleaned up before execution.
-  # * The environment is not set according to the options given to the
-  #   scheduler.
   # * The job's standard and error output is not saved to disk.
   #
   JobRunner = Struct.new(:id, :envs, :script_body, :arguments) do
