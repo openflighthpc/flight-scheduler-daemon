@@ -27,9 +27,10 @@
 
 module FlightScheduler
   autoload(:Application, 'flight_scheduler/application')
-  autoload(:MessageProcessor, 'flight_scheduler/message_processor')
+  autoload(:Configuration, 'flight_scheduler/configuration')
   autoload(:JobRegistry, 'flight_scheduler/job_registry')
   autoload(:JobRunner, 'flight_scheduler/job_runner')
+  autoload(:MessageProcessor, 'flight_scheduler/message_processor')
 
   VERSION = "0.0.1"
 
@@ -40,4 +41,3 @@ module FlightScheduler
   end
   module_function :app
 end
-

@@ -24,9 +24,23 @@
 # For more information on FlightSchedulerDaemon, please visit:
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
+require 'async'
 
-lib = File.expand_path('../lib', __dir__)
-$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+module FlightScheduler
+  class Configuration
+    attr_reader :root
+    attr_accessor \
+      :controller_url,
+      :log_level,
+      :node_name
 
-require 'flight_scheduler'
-require_relative 'environment'
+    def initialize
+      @root = Pathname.new(__dir__).join('../../').expand_path
+    end
+
+    def log_level=(level)
+      @log_level = level
+      Async.logger.send("#{@log_level}!")
+    end
+  end
+end

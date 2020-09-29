@@ -25,8 +25,15 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-lib = File.expand_path('../lib', __dir__)
-$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+FlightScheduler.app.configure do
+  config.log_level = :debug
+  config.controller_url = ENV.fetch(
+    'FLIGHT_SCHEDULER_DAEMON_URL',
+    "http://127.0.0.1:6307/v0/ws"
+  )
+  config.node_name = ENV.fetch(
+    'FLIGHT_SCHEDULER_DAEMON_NODE',
+    `hostname --short`.chomp
+  )
 
-require 'flight_scheduler'
-require_relative 'environment'
+end

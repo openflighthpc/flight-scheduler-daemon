@@ -29,9 +29,6 @@ require 'async'
 require 'async/http/endpoint'
 require 'async/websocket/client'
 
-URL = ENV.fetch('FLIGHT_SCHEDULER_DAEMON_URL', "http://127.0.0.1:6307/v0/ws")
-NODE = ENV.fetch('FLIGHT_SCHEDULER_DAEMON_NODE', `hostname`.chomp)
-
 module FlightScheduler
   # Class to store configuration and provide a singleton resource to lookup
   # that configuration.  Similar in nature to `Rails.app`.
@@ -42,16 +39,30 @@ module FlightScheduler
       @job_registry = job_registry
     end
 
+    def config
+      @config ||= Configuration.new
+    end
+
+    def configure(&block)
+      instance_eval(&block)
+    end
+
+    def root
+      config.root
+    end
+
     def run
       Async do |task|
-        endpoint = Async::HTTP::Endpoint.parse(URL)
+        controller_url = FlightScheduler.app.config.controller_url
+        endpoint = Async::HTTP::Endpoint.parse(controller_url)
+        node = FlightScheduler.app.config.node_name
 
         loop do
-          Async.logger.info("Connecting to #{URL.inspect}")
+          Async.logger.info("Connecting to #{controller_url.inspect}")
           Async::WebSocket::Client.connect(endpoint) do |connection|
-            Async.logger.info("Connected to #{URL.inspect}")
+            Async.logger.info("Connected to #{controller_url.inspect}")
             processor = MessageProcessor.new(connection)
-            connection.write({ command: "CONNECTED", node: NODE })
+            connection.write({ command: "CONNECTED", node: node })
             connection.flush
             while message = connection.read
               processor.call(message)
