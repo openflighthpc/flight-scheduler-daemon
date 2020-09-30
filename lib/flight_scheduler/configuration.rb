@@ -46,6 +46,11 @@ module FlightScheduler
         env_var: true,
         default: 'info',
       },
+      {
+        name: :spool_dir,
+        env_var: true,
+        default: ->(root) { root.join('var/spool') }
+      },
     ]
     attr_accessor(*ATTRIBUTES.map { |a| a[:name] })
 

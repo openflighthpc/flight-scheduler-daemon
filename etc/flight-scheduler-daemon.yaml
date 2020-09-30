@@ -42,3 +42,10 @@
 # setting.
 # Default: info
 # log_level: info
+
+# Spool directory.
+# Environment variable FLIGHT_SCHEDULER_SPOOL_DIR takes precedence over this
+# setting.
+# Default: The relative directory ./var/spool/.  Relative to the root of
+# the flight scheduler installation.
+# spool_dir: './var/spool/'
