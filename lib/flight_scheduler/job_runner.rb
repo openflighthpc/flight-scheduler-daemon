@@ -43,12 +43,8 @@ module FlightScheduler
     extend Forwardable
     def_delegator :task, :wait
 
-    def self.script_dir
-      File.expand_path('../../var/spool/state', __dir__)
-    end
-
-    def build_script_path
-      File.join(self.class.script_dir, id, 'job-script')
+    def script_path
+      FlightScheduler.app.config.spool_dir.join('state', id, 'job-script')
     end
 
     # Checks the various parameters are in the correct format before running
@@ -84,7 +80,7 @@ module FlightScheduler
       string_envs = envs.map { |k, v| [k.to_s, v] }.to_h
 
       # Add the job to the registry
-      path = build_script_path
+      path = script_path.to_path
       FlightScheduler.app.job_registry.add(id, self)
 
       self.task = Async do

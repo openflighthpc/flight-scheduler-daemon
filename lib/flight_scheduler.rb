@@ -25,6 +25,8 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
+require "active_support/string_inquirer"
+
 module FlightScheduler
   autoload(:Application, 'flight_scheduler/application')
   autoload(:Configuration, 'flight_scheduler/configuration')
@@ -40,4 +42,16 @@ module FlightScheduler
     )
   end
   module_function :app
+
+  def env
+    @env ||= ActiveSupport::StringInquirer.new(
+      ENV["RACK_ENV"].presence || "development"
+    )
+  end
+  module_function :env
+
+  def env=(environment)
+    @env = ActiveSupport::StringInquirer.new(environment)
+  end
+  module_function :env=
 end

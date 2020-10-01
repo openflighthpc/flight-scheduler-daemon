@@ -28,14 +28,34 @@ require 'async'
 
 module FlightScheduler
   class Configuration
-    attr_reader :root
-    attr_accessor \
-      :controller_url,
-      :log_level,
-      :node_name
+    autoload(:Loader, 'flight_scheduler/configuration/loader')
 
-    def initialize
-      @root = Pathname.new(__dir__).join('../../').expand_path
+    ATTRIBUTES = [
+      {
+        name: :controller_url,
+        env_var: true,
+        default: "http://127.0.0.1:6307/v0/ws",
+      },
+      {
+        name: :node_name,
+        env_var: true,
+        default: ->(*_) { `hostname --short`.chomp },
+      },
+      {
+        name: :log_level,
+        env_var: true,
+        default: 'info',
+      },
+      {
+        name: :spool_dir,
+        env_var: true,
+        default: ->(root) { root.join('var/spool') }
+      },
+    ]
+    attr_accessor(*ATTRIBUTES.map { |a| a[:name] })
+
+    def self.load(root)
+      Loader.new(root, root.join('etc/flight-scheduler-daemon.yaml')).load
     end
 
     def log_level=(level)
