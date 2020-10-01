@@ -38,7 +38,7 @@ module FlightScheduler
   #
   # * The job's standard and error output is not saved to disk.
   #
-  JobRunner = Struct.new(:id, :envs, :script_body, :arguments, :username) do
+  JobRunner = Struct.new(:id, :envs, :script_body, :arguments, :username, :stdout, :stderr) do
     attr_accessor :child_pid, :task, :status
 
     extend Forwardable
@@ -61,6 +61,8 @@ module FlightScheduler
       return false unless envs.is_a? Hash
       return false unless arguments.is_a? Array
       return false unless passwd
+      return false if stdout.to_s.empty?
+      return false if stderr.to_s.empty?
       true
     end
 
@@ -68,6 +70,18 @@ module FlightScheduler
     def success?
       return nil unless status
       status.success?
+    end
+
+    def spawn_opts
+      # Expands the paths from the home dir and ensure the directory exists
+      paths_hash = { out: stdout, err: stderr }.map do |k, raw|
+        path = File.expand_path(raw.to_s, '~')
+        FileUtils.mkdir_p File.dirname(path)
+        [k, path]
+      end.to_h
+
+      # Unset the environment
+      paths_hash.merge(unsetenv_others: true)
     end
 
     # Run the given arguments in a subprocess and return an Async::Task.
