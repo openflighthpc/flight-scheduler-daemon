@@ -72,18 +72,6 @@ module FlightScheduler
       status.success?
     end
 
-    def spawn_opts
-      # Expands the paths from the home dir and ensure the directory exists
-      paths_hash = { out: stdout, err: stderr }.map do |k, raw|
-        path = File.expand_path(raw.to_s, '~')
-        FileUtils.mkdir_p File.dirname(path)
-        [k, path]
-      end.to_h
-
-      # Unset the environment
-      paths_hash.merge(unsetenv_others: true)
-    end
-
     # Run the given arguments in a subprocess and return an Async::Task.
     #
     # Invariants:
@@ -121,15 +109,29 @@ module FlightScheduler
           Process::Sys.setuid(username)
           Process.setsid
 
+          # Create the stdout/stderr directories
+          stdout_path = File.expand_path(stdout, '~')
+          stderr_path = File.expand_path(stderr, '~')
+          FileUtils.mkdir_p File.dirname(stdout_path)
+          FileUtils.mkdir_p File.dirname(stderr_path)
+
           # Write the script_body to disk
           FileUtils.mkdir_p File.dirname(path)
           File.write(path, script_body)
           FileUtils.chmod 0755, path
 
+          # Build the options hash
+          opts = { unsetenv_others: true }
+          if stdout_path == stderr_path
+            opts.merge!({ [:out, :err] => stdout_path })
+          else
+            opts.merge!(out: stdout_path, err: stderr_path)
+          end
+
           Dir.chdir(passwd.dir)
 
           # Exec into the job command
-          Kernel.exec(string_envs, path, *arguments, unsetenv_others: true)
+          Kernel.exec(string_envs, path, *arguments, **opts)
         end
 
         # Loop asynchronously until the child is finished
