@@ -34,42 +34,20 @@ module FlightScheduler
   #
   # Run the given job script and save a reference to it in the job registry.
   #
-  # Current limitations:
-  #
-  # * The job's standard and error output is not saved to disk.
-  #
-  JobRunner = Struct.new(:id, :envs, :script_body, :arguments, :username, :stdout, :stderr) do
-    attr_accessor :child_pid, :task, :status
+  class JobRunner
 
-    extend Forwardable
-    def_delegator :task, :wait
-
-    def script_path
-      FlightScheduler.app.config.spool_dir.join('state', id, 'job-script')
+    def initialize(job)
+      @job = job
     end
 
-    def passwd
-      @passwd ||= Etc.getpwnam(username)
-    rescue ArgumentError
-      # NOOP - The user can not be found, this is handled in valid?
-    end
-
-    # Checks the various parameters are in the correct format before running
-    # This is to prevent rogue data being passed Process.spawn or rm -f
-    def valid?
-      return false unless /\A[\w-]+\Z/.match? id
-      return false unless envs.is_a? Hash
-      return false unless arguments.is_a? Array
-      return false unless passwd
-      return false if stdout.to_s.empty?
-      return false if stderr.to_s.empty?
-      true
+    def wait
+      @task.wait
     end
 
     # Checks if the child process has exited correctly
     def success?
-      return nil unless status
-      status.success?
+      return nil unless @status
+      @status.success?
     end
 
     # Run the given arguments in a subprocess and return an Async::Task.
@@ -82,79 +60,60 @@ module FlightScheduler
     #   task has completed, the subprocess has completed and is no longer in
     #   the job registry.
     def run
-      raise JobValidationError, <<~ERROR.chomp unless valid?
+      raise JobValidationError, <<~ERROR.chomp unless @job.valid?
         An unexpected error has occurred! The job does not appear to be in a valid state.
       ERROR
 
-      # Ensures env's is a stringified hash
-      string_envs = envs.map { |k, v| [k.to_s, v] }.to_h
-
-      # Add the job to the registry
-      path = script_path.to_path
       FlightScheduler.app.job_registry.add(id, self)
 
-
-      self.task = Async do |task|
+      @task = Async do
         # Fork to create the child process [Non Blocking]
-        self.child_pid = Kernel.fork do
-          # Become the requested user and session leader
-          string_envs.merge!(
-            'HOME' => passwd.dir,
-            'LOGNAME' => username,
-            'PATH' => '/bin:/sbin:/usr/bin:/usr/sbin',
-            'USER' => username,
-            'flight_ROOT' => ENV['flight_ROOT'],
-          )
-
+        @child_pid = Kernel.fork do
           # Write the script_body to disk before we switch user.  We can't
           # assume that the new user can write to this directory.
-          FileUtils.mkdir_p File.dirname(path)
-          File.write(path, script_body)
-          FileUtils.chmod 0755, path
+          @job.write_script
 
-          Process::Sys.setgid(passwd.gid)
-          Process::Sys.setuid(username)
+          # Become the requested user and session leader
+          Process::Sys.setgid(@job.gid)
+          Process::Sys.setuid(@job.username)
           Process.setsid
 
-          # Create the stdout/stderr directories
-          stdout_path = File.expand_path(stdout, passwd.dir)
-          stderr_path = File.expand_path(stderr, passwd.dir)
-          FileUtils.mkdir_p File.dirname(stdout_path)
-          FileUtils.mkdir_p File.dirname(stderr_path)
+          FileUtils.mkdir_p File.dirname(@job.stdout_path)
+          FileUtils.mkdir_p File.dirname(@job.stderr_path)
 
           # Build the options hash
           opts = { unsetenv_others: true }
-          if stdout_path == stderr_path
-            opts.merge!({ [:out, :err] => stdout_path })
+          if @job.stdout_path == @job.stderr_path
+            opts.merge!({ [:out, :err] => @job.stdout_path })
           else
-            opts.merge!(out: stdout_path, err: stderr_path)
+            opts.merge!(out: @job.stdout_path, err: @job.stderr_path)
           end
 
-          Dir.chdir(passwd.dir)
+          Dir.chdir(@job.working_dir)
 
           # Exec into the job command
-          Kernel.exec(string_envs, path, *arguments, **opts)
+          Kernel.exec(@job.env, @job.path, *@job.arguments, **opts)
         end
 
         # Loop asynchronously until the child is finished
-        until out = Process.wait2(child_pid, Process::WNOHANG) do
-          task.yield
+        until out = Process.wait2(@child_pid, Process::WNOHANG) do
+          @task.yield
         end
-        self.status = out.last
+        @status = out.last
 
         # Reset the child_pid, this prevents cancel killing other processes
         # which might spawn with the same PID
-        self.child_pid = nil
+        @child_pid = nil
       ensure
-        FlightScheduler.app.job_registry.remove(id)
-        FileUtils.rm_rf File.dirname(path)
+        FlightScheduler.app.job_registry.remove(@job.id)
+        @job.remove_script
       end
     end
 
     # Kills the associated subprocess
     def cancel
-      return unless child_pid
-      Kernel.kill('SIGTERM', self.child_pid)
+      return unless @child_pid
+      Kernel.kill('SIGTERM', @child_pid)
     rescue Errno::ESRCH
       # NOOP - Don't worry if the process has already finished
     end

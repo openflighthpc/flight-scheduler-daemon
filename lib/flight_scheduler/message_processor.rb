@@ -51,8 +51,9 @@ module FlightScheduler
         Async.logger.info("Running job:#{job_id} script:#{script} arguments:#{arguments}")
         Async.logger.debug("Environment: #{env.map { |k, v| "#{k}=#{v}" }.join("\n")}")
         begin
-          job = FlightScheduler::JobRunner.new(job_id, env, script, arguments, username, stdout, stderr)
-          job.run
+          job = FlightScheduler::Job.new(job_id, env, script, arguments, username, stdout, stderr)
+          runner = FlightScheduler::JobRunner.new(job)
+          runner.run
         rescue
           Async.logger.info("Error running job #{job_id} #{$!.message}")
           if message[:array_job_id]
@@ -67,10 +68,10 @@ module FlightScheduler
           @connection.flush
         else
           Async do
-            job.wait
+            runner.wait
             Async.logger.info("Completed job #{job_id}")
             if message[:array_job_id]
-              command = job.success? ?
+              command = runner.success? ?
                 'NODE_COMPLETED_ARRAY_TASK' :
                 'NODE_FAILED_ARRAY_TASK'
               @connection.write({
@@ -79,7 +80,7 @@ module FlightScheduler
                 array_task_id: message[:array_task_id],
               })
             else
-              command = job.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
+              command = runner.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
               @connection.write({command: command, job_id: job_id})
             end
             @connection.flush
