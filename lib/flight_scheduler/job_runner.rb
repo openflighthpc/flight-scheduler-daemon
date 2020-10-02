@@ -66,7 +66,7 @@ module FlightScheduler
         ERROR
       end
 
-      FlightScheduler.app.job_registry.add(id, self)
+      FlightScheduler.app.job_registry.add_runner(@job.id, 'BATCH', self)
       @task = Async do
         # Fork to create the child process [Non Blocking]
         @child_pid = Kernel.fork do
@@ -106,7 +106,7 @@ module FlightScheduler
         # which might spawn with the same PID
         @child_pid = nil
       ensure
-        FlightScheduler.app.job_registry.remove(@job.id)
+        FlightScheduler.app.job_registry.remove_runner(@job.id, 'BATCH')
         @job.remove_script
       end
     end
