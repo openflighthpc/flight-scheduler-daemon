@@ -60,39 +60,40 @@ module FlightScheduler
     #   task has completed, the subprocess has completed and is no longer in
     #   the job registry.
     def run
-      raise JobValidationError, <<~ERROR.chomp unless @job.valid?
-        An unexpected error has occurred! The job does not appear to be in a valid state.
-      ERROR
+      unless @job.valid? && @job.has_script? && @job.script.valid?
+        raise JobValidationError, <<~ERROR.chomp
+          An unexpected error has occurred! The job does not appear to be in a valid state.
+        ERROR
+      end
 
       FlightScheduler.app.job_registry.add(id, self)
-
       @task = Async do
         # Fork to create the child process [Non Blocking]
         @child_pid = Kernel.fork do
           # Write the script_body to disk before we switch user.  We can't
           # assume that the new user can write to this directory.
-          @job.write_script
+          @job.script.write
 
           # Become the requested user and session leader
           Process::Sys.setgid(@job.gid)
           Process::Sys.setuid(@job.username)
           Process.setsid
 
-          FileUtils.mkdir_p File.dirname(@job.stdout_path)
-          FileUtils.mkdir_p File.dirname(@job.stderr_path)
+          FileUtils.mkdir_p File.dirname(@job.script.stdout_path)
+          FileUtils.mkdir_p File.dirname(@job.script.stderr_path)
 
           # Build the options hash
           opts = { unsetenv_others: true }
-          if @job.stdout_path == @job.stderr_path
-            opts.merge!({ [:out, :err] => @job.stdout_path })
+          if @job.script.stdout_path == @job.script.stderr_path
+            opts.merge!({ [:out, :err] => @job.script.stdout_path })
           else
-            opts.merge!(out: @job.stdout_path, err: @job.stderr_path)
+            opts.merge!(out: @job.script.stdout_path, err: @job.script.stderr_path)
           end
 
           Dir.chdir(@job.working_dir)
 
           # Exec into the job command
-          Kernel.exec(@job.env, @job.path, *@job.arguments, **opts)
+          Kernel.exec(@job.env, @job.script.path, *@job.script.arguments, **opts)
         end
 
         # Loop asynchronously until the child is finished

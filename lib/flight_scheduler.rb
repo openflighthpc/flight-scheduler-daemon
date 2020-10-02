@@ -35,6 +35,7 @@ module FlightScheduler
   autoload(:JobRegistry, 'flight_scheduler/job_registry')
   autoload(:JobRunner, 'flight_scheduler/job_runner')
   autoload(:MessageProcessor, 'flight_scheduler/message_processor')
+  autoload(:SubmissionScript, 'flight_scheduler/submission_script')
 
   VERSION = "0.0.1"
 

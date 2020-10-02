@@ -26,53 +26,53 @@
 #==============================================================================
 
 module FlightScheduler
-  class Job
+  class SubmissionScript
 
-    attr_reader :id, :username
-    attr_accessor :script
+    attr_reader :job, :arguments
 
-    def initialize(id, env, username)
-      @id = id
-      @env = env
-      @username = username
+    def initialize(job, script_body, arguments, stdout_path, stderr_path)
+      @job = job
+      @script_body = script_body
+      @arguments = arguments
+      @stdout_path = stdout_path
+      @stderr_path = stderr_path
+    end
+
+    def path
+      spool_dir = FlightScheduler.app.config.spool_dir
+      spool_dir.join('state', job.id, 'job-script').to_path
     end
 
     # Checks the various parameters are in the correct format before running
     # This is to prevent rogue data being passed Process.spawn or rm -f
     def valid?
-      return false unless /\A[\w-]+\Z/.match? id
-      return false unless env.is_a? Hash
-      return false unless passwd
+      return false unless job
+      return false unless @script_body.is_a? String
+      return false if @script_body.empty?
+      return false unless @script_body[0..1] == '#!'
+      return false unless arguments.is_a? Array
+      return false if stdout_path.to_s.empty?
+      return false if stderr_path.to_s.empty?
       true
     end
 
-    def env
-      stringified = super.map { |k, v| [k.to_s, v] }.to_h
-      stringified.merge(
-        'HOME' => home_dir,
-        'LOGNAME' => username,
-        'PATH' => '/bin:/sbin:/usr/bin:/usr/sbin',
-        'USER' => username,
-        'flight_ROOT' => ENV['flight_ROOT'],
-      )
+    def stdout_path
+      File.expand_path(@stdout_path, job.home_dir)
     end
 
-    def home_dir
-      passwd.dir
+    def stderr_path 
+      File.expand_path(@stderr_path, job.home_dir)
     end
 
-    def working_dir
-      home_dir
+    def write
+      # Write the script_body to disk
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, script_body)
+      FileUtils.chmod(0755, path)
     end
 
-    def gid
-      passwd.gid
-    end
-
-    def passwd
-      @passwd ||= Etc.getpwnam(username)
-    rescue ArgumentError
-      # NOOP - The user can not be found, this is handled in valid?
+    def remove
+      FileUtils.rm_rf(File.dirname(path))
     end
   end
 end

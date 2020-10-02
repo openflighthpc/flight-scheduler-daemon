@@ -51,9 +51,12 @@ module FlightScheduler
         Async.logger.info("Running job:#{job_id} script:#{script} arguments:#{arguments}")
         Async.logger.debug("Environment: #{env.map { |k, v| "#{k}=#{v}" }.join("\n")}")
         begin
-          job = FlightScheduler::Job.new(job_id, env, script, arguments, username, stdout, stderr)
-          runner = FlightScheduler::JobRunner.new(job)
-          runner.run
+          job = FlightScheduler::Job.new(job_id, env, username)
+          if script
+            job.script = SubmissionScript.new(job, script, arguments, stdout, stderr)
+            runner = FlightScheduler::JobRunner.new(job)
+            runner.run
+          end
         rescue
           Async.logger.info("Error running job #{job_id} #{$!.message}")
           if message[:array_job_id]
@@ -67,30 +70,33 @@ module FlightScheduler
           end
           @connection.flush
         else
-          Async do
-            runner.wait
-            Async.logger.info("Completed job #{job_id}")
-            if message[:array_job_id]
-              command = runner.success? ?
-                'NODE_COMPLETED_ARRAY_TASK' :
-                'NODE_FAILED_ARRAY_TASK'
-              @connection.write({
-                command: command,
-                array_job_id: message[:array_job_id],
-                array_task_id: message[:array_task_id],
-              })
-            else
-              command = runner.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
-              @connection.write({command: command, job_id: job_id})
+          unless job.script.nil?
+            Async do
+              runner.wait
+              Async.logger.info("Completed job #{job_id}")
+              if message[:array_job_id]
+                command = runner.success? ?
+                  'NODE_COMPLETED_ARRAY_TASK' :
+                  'NODE_FAILED_ARRAY_TASK'
+                @connection.write({
+                  command: command,
+                  array_job_id: message[:array_job_id],
+                  array_task_id: message[:array_task_id],
+                })
+              else
+                command = runner.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
+                @connection.write({command: command, job_id: job_id})
+              end
+              @connection.flush
             end
-            @connection.flush
           end
         end
 
       when 'JOB_CANCELLED'
         job_id = message[:job_id]
         Async.logger.info("Cancelling job:#{job_id}")
-        FlightScheduler.app.job_registry[job_id].cancel
+        job_runner = FlightScheduler.app.job_registry[job_id]
+        job_runner.cancel if job_runner
         # The JOB_ALLOCATED task will report back that the process has failed.
         # We don't need to send any messages to the controller here.
 
