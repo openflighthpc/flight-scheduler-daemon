@@ -77,7 +77,7 @@ module FlightScheduler
         end
         begin
           job = FlightScheduler.app.job_registry.lookup_job(job_id)
-          job.script = SubmissionScript.new(job, script, arguments, stdout, stderr)
+          job.script = BatchScript.new(job, script, arguments, stdout, stderr)
           runner = FlightScheduler::JobRunner.new(job)
           runner.run
         rescue

@@ -26,7 +26,7 @@
 #==============================================================================
 
 module FlightScheduler
-  class SubmissionScript
+  class BatchScript
 
     attr_reader :job, :arguments
 

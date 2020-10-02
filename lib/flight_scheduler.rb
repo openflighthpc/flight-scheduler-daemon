@@ -30,12 +30,14 @@ require 'flight_scheduler/errors'
 
 module FlightScheduler
   autoload(:Application, 'flight_scheduler/application')
+  autoload(:BatchScript, 'flight_scheduler/batch_script')
   autoload(:Configuration, 'flight_scheduler/configuration')
   autoload(:Job, 'flight_scheduler/job')
   autoload(:JobRegistry, 'flight_scheduler/job_registry')
   autoload(:JobRunner, 'flight_scheduler/job_runner')
+  autoload(:JobStep, 'flight_scheduler/job_step')
+  autoload(:JobStepRunner, 'flight_scheduler/job_step_runner')
   autoload(:MessageProcessor, 'flight_scheduler/message_processor')
-  autoload(:SubmissionScript, 'flight_scheduler/submission_script')
 
   VERSION = "0.0.1"
 
