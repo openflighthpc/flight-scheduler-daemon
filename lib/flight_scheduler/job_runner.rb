@@ -28,6 +28,7 @@
 require 'async'
 require 'async/process'
 require 'forwardable'
+require 'etc'
 
 module FlightScheduler
   #
@@ -37,7 +38,7 @@ module FlightScheduler
   #
   # * The job's standard and error output is not saved to disk.
   #
-  JobRunner = Struct.new(:id, :envs, :script_body, :arguments) do
+  JobRunner = Struct.new(:id, :envs, :script_body, :arguments, :username) do
     attr_accessor :child_pid, :task, :status
 
     extend Forwardable
@@ -47,12 +48,19 @@ module FlightScheduler
       FlightScheduler.app.config.spool_dir.join('state', id, 'job-script')
     end
 
+    def passwd
+      @passwd ||= Etc.getpwnam(username)
+    rescue ArgumentError
+      # NOOP - The user can not be found, this is handled in valid?
+    end
+
     # Checks the various parameters are in the correct format before running
     # This is to prevent rogue data being passed Process.spawn or rm -f
     def valid?
       return false unless /\A[\w-]+\Z/.match? id
       return false unless envs.is_a? Hash
       return false unless arguments.is_a? Array
+      return false unless passwd
       true
     end
 
@@ -86,6 +94,13 @@ module FlightScheduler
       self.task = Async do |task|
         # Fork to create the child process [Non Blocking]
         self.child_pid = Kernel.fork do
+          # Become the requested user and session leader
+          ENV['HOME'] = passwd.dir
+          ENV['USER'] = username
+          Process::Sys.setgid(passwd.gid)
+          Process::Sys.setuid(username)
+          Process.setsid
+
           # Write the script_body to disk
           FileUtils.mkdir_p File.dirname(path)
           File.write(path, script_body)
