@@ -105,6 +105,38 @@ module FlightScheduler
           end
         end
 
+      when 'RUN_STEP'
+        arguments = message[:arguments]
+        job_id    = message[:job_id]
+        path      = message[:path]
+        step_id   = message[:step_id]
+
+        Async.logger.debug("Running step:#{step_id} for job:#{job_id} path:#{path} arguments:#{arguments}")
+        error_handler = lambda do
+          Async.logger.info("Error running step:#{step_id} for job:#{job_id} #{$!.message}")
+          @connection.write({command: 'RUN_STEP_FAILED', job_id: job_id, step_id: step_id})
+          @connection.flush
+        end
+        begin
+          job = FlightScheduler.app.job_registry.lookup_job!(job_id)
+          step = JobStep.new(job, step_id, path, arguments)
+          runner = JobStepRunner.new(step)
+          runner.run
+        rescue
+          error_handler.call
+        else
+          Async do
+            runner.wait
+            Async.logger.info("Completed step for job #{job_id}")
+            Async.logger.debug("Output: #{runner.output}")
+            command = runner.success? ? 'RUN_STEP_COMPLETED' : 'RUN_STEP_FAILED'
+            @connection.write({command: command, job_id: job_id})
+            @connection.flush
+          rescue
+            error_handler.call
+          end
+        end
+
       when 'JOB_CANCELLED'
         job_id = message[:job_id]
         Async.logger.info("Cancelling job:#{job_id}")
