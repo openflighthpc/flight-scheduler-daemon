@@ -91,12 +91,18 @@ module FlightScheduler
       path = script_path.to_path
       FlightScheduler.app.job_registry.add(id, self)
 
+
       self.task = Async do |task|
         # Fork to create the child process [Non Blocking]
         self.child_pid = Kernel.fork do
           # Become the requested user and session leader
-          ENV['HOME'] = passwd.dir
-          ENV['USER'] = username
+          string_envs.merge!(
+            'HOME' => passwd.dir,
+            'LOGNAME' => username,
+            'PATH' => '/bin:/sbin:/usr/bin:/usr/sbin',
+            'USER' => username,
+            'flight_ROOT' => ENV['flight_ROOT'],
+          )
           Process::Sys.setgid(passwd.gid)
           Process::Sys.setuid(username)
           Process.setsid
@@ -105,6 +111,8 @@ module FlightScheduler
           FileUtils.mkdir_p File.dirname(path)
           File.write(path, script_body)
           FileUtils.chmod 0755, path
+
+          Dir.chdir(passwd.dir)
 
           # Exec into the job command
           Kernel.exec(string_envs, path, *arguments, unsetenv_others: true)
