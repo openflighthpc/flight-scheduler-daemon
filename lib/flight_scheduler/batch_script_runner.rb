@@ -68,7 +68,7 @@ module FlightScheduler
       end
 
       FlightScheduler.app.job_registry.add_runner(@job.id, 'BATCH', self)
-      @task = Async do
+      @task = Async do |task|
         # Fork to create the child process [Non Blocking]
         @child_pid = Kernel.fork do
           # Write the script_body to disk before we switch user.  We can't
@@ -98,7 +98,7 @@ module FlightScheduler
 
         # Loop asynchronously until the child is finished
         until out = Process.wait2(@child_pid, Process::WNOHANG) do
-          @task.yield
+          task.yield
         end
         @status = out.last
 
@@ -107,7 +107,7 @@ module FlightScheduler
         @child_pid = nil
       ensure
         FlightScheduler.app.job_registry.remove_runner(@job.id, 'BATCH')
-        @job.remove_script
+        @script.remove
       end
     end
 

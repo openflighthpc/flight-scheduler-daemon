@@ -67,7 +67,7 @@ module FlightScheduler
     def write
       # Write the script_body to disk
       FileUtils.mkdir_p(File.dirname(path))
-      File.write(path, script_body)
+      File.write(path, @script_body)
       FileUtils.chmod(0755, path)
     end
 

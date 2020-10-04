@@ -48,7 +48,7 @@ module FlightScheduler
     end
 
     def env
-      stringified = super.map { |k, v| [k.to_s, v] }.to_h
+      stringified = @env.map { |k, v| [k.to_s, v] }.to_h
       stringified.merge(
         'HOME' => home_dir,
         'LOGNAME' => username,
