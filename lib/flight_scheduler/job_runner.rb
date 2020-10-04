@@ -105,20 +105,22 @@ module FlightScheduler
             'USER' => username,
             'flight_ROOT' => ENV['flight_ROOT'],
           )
+
+          # Write the script_body to disk before we switch user.  We can't
+          # assume that the new user can write to this directory.
+          FileUtils.mkdir_p File.dirname(path)
+          File.write(path, script_body)
+          FileUtils.chmod 0755, path
+
           Process::Sys.setgid(passwd.gid)
           Process::Sys.setuid(username)
           Process.setsid
 
           # Create the stdout/stderr directories
-          stdout_path = File.expand_path(stdout, '~')
-          stderr_path = File.expand_path(stderr, '~')
+          stdout_path = File.expand_path(stdout, passwd.dir)
+          stderr_path = File.expand_path(stderr, passwd.dir)
           FileUtils.mkdir_p File.dirname(stdout_path)
           FileUtils.mkdir_p File.dirname(stderr_path)
-
-          # Write the script_body to disk
-          FileUtils.mkdir_p File.dirname(path)
-          File.write(path, script_body)
-          FileUtils.chmod 0755, path
 
           # Build the options hash
           opts = { unsetenv_others: true }
