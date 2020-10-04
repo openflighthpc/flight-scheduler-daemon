@@ -38,7 +38,7 @@ module FlightScheduler
   #
   # * The job's standard and error output is not saved to disk.
   #
-  JobRunner = Struct.new(:id, :envs, :script_body, :arguments, :username) do
+  JobRunner = Struct.new(:id, :envs, :script_body, :arguments, :username, :stdout, :stderr) do
     attr_accessor :child_pid, :task, :status
 
     extend Forwardable
@@ -61,6 +61,8 @@ module FlightScheduler
       return false unless envs.is_a? Hash
       return false unless arguments.is_a? Array
       return false unless passwd
+      return false if stdout.to_s.empty?
+      return false if stderr.to_s.empty?
       true
     end
 
@@ -103,19 +105,35 @@ module FlightScheduler
             'USER' => username,
             'flight_ROOT' => ENV['flight_ROOT'],
           )
-          Process::Sys.setgid(passwd.gid)
-          Process::Sys.setuid(username)
-          Process.setsid
 
-          # Write the script_body to disk
+          # Write the script_body to disk before we switch user.  We can't
+          # assume that the new user can write to this directory.
           FileUtils.mkdir_p File.dirname(path)
           File.write(path, script_body)
           FileUtils.chmod 0755, path
 
+          Process::Sys.setgid(passwd.gid)
+          Process::Sys.setuid(username)
+          Process.setsid
+
+          # Create the stdout/stderr directories
+          stdout_path = File.expand_path(stdout, passwd.dir)
+          stderr_path = File.expand_path(stderr, passwd.dir)
+          FileUtils.mkdir_p File.dirname(stdout_path)
+          FileUtils.mkdir_p File.dirname(stderr_path)
+
+          # Build the options hash
+          opts = { unsetenv_others: true }
+          if stdout_path == stderr_path
+            opts.merge!({ [:out, :err] => stdout_path })
+          else
+            opts.merge!(out: stdout_path, err: stderr_path)
+          end
+
           Dir.chdir(passwd.dir)
 
           # Exec into the job command
-          Kernel.exec(string_envs, path, *arguments, unsetenv_others: true)
+          Kernel.exec(string_envs, path, *arguments, **opts)
         end
 
         # Loop asynchronously until the child is finished

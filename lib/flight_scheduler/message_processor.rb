@@ -45,11 +45,13 @@ module FlightScheduler
         arguments = message[:arguments]
         env       = message[:environment]
         username  = message[:username]
+        stdout    = message[:stdout_path]
+        stderr    = message[:stderr_path]
 
         Async.logger.info("Running job:#{job_id} script:#{script} arguments:#{arguments}")
         Async.logger.debug("Environment: #{env.map { |k, v| "#{k}=#{v}" }.join("\n")}")
         begin
-          job = FlightScheduler::JobRunner.new(job_id, env, script, arguments, username)
+          job = FlightScheduler::JobRunner.new(job_id, env, script, arguments, username, stdout, stderr)
           job.run
         rescue
           Async.logger.info("Error running job #{job_id} #{$!.message}")

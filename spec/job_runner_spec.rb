@@ -40,7 +40,9 @@ RSpec.describe FlightScheduler::JobRunner do
   let(:arguments) { [] }
 
   subject do
-    described_class.new(job_id, env, script_body, arguments, Etc.getlogin)
+    described_class.new(
+      job_id, env, script_body, arguments, Etc.getlogin, '/tmp/foo', '/tmp/foo'
+    )
   end
 
   it { should be_valid }
