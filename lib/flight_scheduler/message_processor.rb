@@ -55,13 +55,13 @@ module FlightScheduler
         end
 
       when 'RUN_SCRIPT'
-        arguments = message[:arguments]
-        job_id    = message[:job_id]
-        script    = message[:script]
-        stderr    = message[:stderr_path]
-        stdout    = message[:stdout_path]
+        arguments   = message[:arguments]
+        job_id      = message[:job_id]
+        script_body = message[:script]
+        stderr      = message[:stderr_path]
+        stdout      = message[:stdout_path]
 
-        Async.logger.debug("Running script for job:#{job_id} script:#{script} arguments:#{arguments}")
+        Async.logger.debug("Running script for job:#{job_id} script:#{script_body} arguments:#{arguments}")
         error_handler = lambda do
           Async.logger.info("Error running script job:#{job_id} #{$!.message}")
           if message[:array_job_id]
@@ -77,8 +77,8 @@ module FlightScheduler
         end
         begin
           job = FlightScheduler.app.job_registry.lookup_job(job_id)
-          job.script = BatchScript.new(job, script, arguments, stdout, stderr)
-          runner = FlightScheduler::JobRunner.new(job)
+          script = BatchScript.new(job, script_body, arguments, stdout, stderr)
+          runner = FlightScheduler::BatchScriptRunner.new(script)
           runner.run
         rescue
           error_handler.call

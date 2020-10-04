@@ -28,7 +28,7 @@
 require 'spec_helper'
 require 'securerandom'
 
-RSpec.describe FlightScheduler::JobRunner do
+RSpec.describe FlightScheduler::BatchScriptRunner do
   let(:job_id) { SecureRandom.uuid }
   let(:env) { {} }
   let(:script_body) do

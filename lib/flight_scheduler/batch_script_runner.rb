@@ -26,18 +26,17 @@
 #==============================================================================
 
 require 'async'
-require 'async/process'
-require 'forwardable'
-require 'etc'
 
 module FlightScheduler
   #
-  # Run the given job script and save a reference to it in the job registry.
+  # Run the given batch script and save a reference to the child process in
+  # the job registry.
   #
-  class JobRunner
+  class BatchScriptRunner
 
-    def initialize(job)
-      @job = job
+    def initialize(script)
+      @script = script
+      @job = @script.job
     end
 
     def wait
@@ -50,19 +49,21 @@ module FlightScheduler
       @status.success?
     end
 
-    # Run the given arguments in a subprocess and return an Async::Task.
+    # Run the given batch script in a subprocess and return an Async::Task.
     #
     # Invariants:
     #
-    # * Blocks until the job has been validated and recorded in the registry
+    # * Blocks until the job and script have been validated and recorded in
+    #   the job registry.
     #
     # * Returns an Async::Task that can be `wait`ed on.  When the returned
     #   task has completed, the subprocess has completed and is no longer in
     #   the job registry.
     def run
-      unless @job.valid? && @job.has_script? && @job.script.valid?
+      unless @job.valid? && @script.valid?
         raise JobValidationError, <<~ERROR.chomp
-          An unexpected error has occurred! The job does not appear to be in a valid state.
+          An unexpected error has occurred! The batch script does not appear
+          to be in a valid state.
         ERROR
       end
 
@@ -72,28 +73,27 @@ module FlightScheduler
         @child_pid = Kernel.fork do
           # Write the script_body to disk before we switch user.  We can't
           # assume that the new user can write to this directory.
-          @job.script.write
+          @script.write
 
           # Become the requested user and session leader
           Process::Sys.setgid(@job.gid)
           Process::Sys.setuid(@job.username)
           Process.setsid
 
-          FileUtils.mkdir_p File.dirname(@job.script.stdout_path)
-          FileUtils.mkdir_p File.dirname(@job.script.stderr_path)
+          FileUtils.mkdir_p File.dirname(@script.stdout_path)
+          FileUtils.mkdir_p File.dirname(@script.stderr_path)
 
           # Build the options hash
           opts = { unsetenv_others: true }
-          if @job.script.stdout_path == @job.script.stderr_path
-            opts.merge!({ [:out, :err] => @job.script.stdout_path })
+          if @script.stdout_path == @script.stderr_path
+            opts.merge!({ [:out, :err] => @script.stdout_path })
           else
-            opts.merge!(out: @job.script.stdout_path, err: @job.script.stderr_path)
+            opts.merge!(out: @script.stdout_path, err: @script.stderr_path)
           end
 
           Dir.chdir(@job.working_dir)
-
           # Exec into the job command
-          Kernel.exec(@job.env, @job.script.path, *@job.script.arguments, **opts)
+          Kernel.exec(@job.env, @script.path, *@script.arguments, **opts)
         end
 
         # Loop asynchronously until the child is finished

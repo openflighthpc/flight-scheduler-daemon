@@ -25,11 +25,12 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
+require 'etc'
+
 module FlightScheduler
   class Job
 
     attr_reader :id, :username
-    attr_accessor :script
 
     def initialize(id, env, username)
       @id = id
