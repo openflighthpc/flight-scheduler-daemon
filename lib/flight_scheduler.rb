@@ -26,6 +26,7 @@
 #==============================================================================
 
 require "active_support/string_inquirer"
+require 'flight_scheduler/errors'
 
 module FlightScheduler
   autoload(:Application, 'flight_scheduler/application')
