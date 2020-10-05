@@ -138,14 +138,22 @@ module FlightScheduler
         end
 
       when 'JOB_CANCELLED'
-        job_id = message[:job_id]
         Async.logger.info("Cancelling job:#{job_id}")
-        job_runner = FlightScheduler.app.job_registry.lookup_runner(job_id, 'BATCH')
-        if job_runner
-          job_runner.cancel
-          # The RUN_SCRIPT task will report back that the process has failed.
-          # We don't need to send any messages to the controller here.
+
+        # Remove the job to prevent any further job steps
+        job_id = message[:job_id]
+        FlightScheduler.app.job_registry.remove_job(job_id)
+
+        # Cancel all current runners
+        FlightScheduler.app.job_registry_lookup_runners(job_id).each do |runner|
+          runner.cancel
         end
+
+      when 'JOB_DEALLOCATED'
+        Async.logger.info("Deallocating job:#{job_id}")
+
+        # Remove the job to prevent any further job steps
+        job_id = message[:job_id]
         FlightScheduler.app.job_registry.remove_job(job_id)
 
       else

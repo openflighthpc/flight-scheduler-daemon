@@ -81,6 +81,11 @@ module FlightScheduler
       lookup_job(job_id) or raise UnknownJob, job_id
     end
 
+    def lookup_runners(job_id)
+      data = @jobs[job_id]
+      data.nil? ? [] : data[:runners].to_a.flatten
+    end
+
     def lookup_runner(job_id, runner_id)
       data = @jobs[job_id]
       data.nil? ? nil : data[:runners][runner_id]
