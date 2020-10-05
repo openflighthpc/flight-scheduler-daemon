@@ -148,8 +148,14 @@ module FlightScheduler
         FlightScheduler.app.job_registry.remove_job(job_id)
 
         # Cancel all current runners
-        FlightScheduler.app.job_registry_lookup_runners(job_id).each do |runner|
+        FlightScheduler.app.job_registry.lookup_runners(job_id).each do |runner|
           runner.cancel
+        end
+
+        # Report back when all the runners have stop
+        Async do |task|
+          task.yield until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
+          MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
         end
 
       when 'JOB_DEALLOCATED'
@@ -158,6 +164,12 @@ module FlightScheduler
         # Remove the job to prevent any further job steps
         job_id = message[:job_id]
         FlightScheduler.app.job_registry.remove_job(job_id)
+
+        # Report back when all the runners have stop
+        Async do |task|
+          task.yield until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
+          MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
+        end
 
       else
         Async.logger.info("Unknown message #{message}")
