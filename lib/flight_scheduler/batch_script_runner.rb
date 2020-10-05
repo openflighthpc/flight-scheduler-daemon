@@ -114,7 +114,7 @@ module FlightScheduler
     # Kills the associated subprocess
     def cancel
       return unless @child_pid
-      Kernel.kill('SIGTERM', @child_pid)
+      Process.kill('SIGTERM', @child_pid)
     rescue Errno::ESRCH
       # NOOP - Don't worry if the process has already finished
     end
