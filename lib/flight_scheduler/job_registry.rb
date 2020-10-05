@@ -38,24 +38,52 @@ module FlightScheduler
   #
   class JobRegistry
     class DuplicateJob < RuntimeError; end
+    class DuplicateRunner < RuntimeError; end
+    class UnknownJob < RuntimeError; end
 
     def initialize
       @jobs = Concurrent::Hash.new
     end
 
-    def add(id, job)
-      if @jobs[id]
-        raise DuplicateJob, id
+    def add_job(job_id, job)
+      if @jobs[job_id]
+        raise DuplicateJob, job_id
       end
-      @jobs[id] = job
+      @jobs[job_id] = { job: job, runners: Concurrent::Hash.new }
     end
 
-    def remove(id)
-      @jobs.delete(id)
+    def add_runner(job_id, runner_id, runner)
+      data = @jobs[job_id]
+      raise UnknownJob, job_id if data.nil?
+      runners = data[:runners]
+      if runners[runner_id]
+        raise DuplicateRunner, runner_id
+      end
+      runners[runner_id] = runner
     end
 
-    def [](id)
-      @jobs[id]
+    def remove_job(job_id)
+      @jobs.delete(job_id)
+    end
+
+    def remove_runner(job_id, runner_id)
+      data = @jobs[job_id]
+      return if data.nil?
+      data[:runners].delete(runner_id)
+    end
+
+    def lookup_job(job_id)
+      data = @jobs[job_id]
+      data.nil? ? nil : data[:job]
+    end
+
+    def lookup_job!(job_id)
+      lookup_job(job_id) or raise UnknownJob, job_id
+    end
+
+    def lookup_runner(job_id, runner_id)
+      data = @jobs[job_id]
+      data.nil? ? nil : data[:runners][runner_id]
     end
   end
 end

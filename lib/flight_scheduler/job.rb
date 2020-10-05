@@ -25,50 +25,55 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-require 'spec_helper'
-require 'securerandom'
+require 'etc'
 
-RSpec.describe FlightScheduler::JobRunner do
-  let(:job_id) { SecureRandom.uuid }
-  let(:env) { {} }
-  let(:script_body) do
-    <<~SCRIPT
-      #!/bin/bash
-      echo 'test'
-    SCRIPT
-  end
-  let(:arguments) { [] }
+module FlightScheduler
+  class Job
 
-  subject do
-    described_class.new(
-      job_id, env, script_body, arguments, Etc.getlogin, '/tmp/foo', '/tmp/foo'
-    )
-  end
+    attr_reader :id, :username
 
-  it { should be_valid }
+    def initialize(id, env, username)
+      @id = id
+      @env = env
+      @username = username
+    end
 
-  context 'with a nil job_id' do
-    let(:job_id) { nil }
+    # Checks the various parameters are in the correct format before running
+    # This is to prevent rogue data being passed Process.spawn or rm -f
+    def valid?
+      return false unless /\A[\w-]+\Z/.match? id
+      return false unless env.is_a? Hash
+      return false unless passwd
+      true
+    end
 
-    it { should_not be_valid }
-  end
+    def env
+      stringified = @env.map { |k, v| [k.to_s, v] }.to_h
+      stringified.merge(
+        'HOME' => home_dir,
+        'LOGNAME' => username,
+        'PATH' => '/bin:/sbin:/usr/bin:/usr/sbin',
+        'USER' => username,
+        'flight_ROOT' => ENV['flight_ROOT'],
+      )
+    end
 
-  context 'with a file path as the job_id' do
-    let(:job_id) { '../../../../../../../root' }
+    def home_dir
+      passwd.dir
+    end
 
-    it { should_not be_valid }
-  end
+    def working_dir
+      home_dir
+    end
 
-  context 'with a script as the env' do
-    let(:env) { '/usr/sbin/shutdown' }
+    def gid
+      passwd.gid
+    end
 
-    it { should_not be_valid }
-  end
-
-  context 'with a string as arrguments' do
-    let(:arguments) { 'adds-nice-handling-to-internal-errors' }
-
-    it { should_not be_valid }
+    def passwd
+      @passwd ||= Etc.getpwnam(username)
+    rescue ArgumentError
+      # NOOP - The user can not be found, this is handled in valid?
+    end
   end
 end
-

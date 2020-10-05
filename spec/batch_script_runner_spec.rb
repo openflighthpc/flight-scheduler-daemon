@@ -25,38 +25,50 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-require "active_support/string_inquirer"
-require 'flight_scheduler/errors'
+require 'spec_helper'
+require 'securerandom'
 
-module FlightScheduler
-  autoload(:Application, 'flight_scheduler/application')
-  autoload(:BatchScript, 'flight_scheduler/batch_script')
-  autoload(:Configuration, 'flight_scheduler/configuration')
-  autoload(:Job, 'flight_scheduler/job')
-  autoload(:JobRegistry, 'flight_scheduler/job_registry')
-  autoload(:BatchScriptRunner, 'flight_scheduler/batch_script_runner')
-  autoload(:JobStep, 'flight_scheduler/job_step')
-  autoload(:JobStepRunner, 'flight_scheduler/job_step_runner')
-  autoload(:MessageProcessor, 'flight_scheduler/message_processor')
+RSpec.describe FlightScheduler::BatchScriptRunner do
+  let(:job_id) { SecureRandom.uuid }
+  let(:env) { {} }
+  let(:script_body) do
+    <<~SCRIPT
+      #!/bin/bash
+      echo 'test'
+    SCRIPT
+  end
+  let(:arguments) { [] }
 
-  VERSION = "0.0.1"
-
-  def app
-    @app ||= Application.new(
-      job_registry: JobRegistry.new,
+  subject do
+    described_class.new(
+      job_id, env, script_body, arguments, Etc.getlogin, '/tmp/foo', '/tmp/foo'
     )
   end
-  module_function :app
 
-  def env
-    @env ||= ActiveSupport::StringInquirer.new(
-      ENV["RACK_ENV"].presence || "development"
-    )
-  end
-  module_function :env
+  it { should be_valid }
 
-  def env=(environment)
-    @env = ActiveSupport::StringInquirer.new(environment)
+  context 'with a nil job_id' do
+    let(:job_id) { nil }
+
+    it { should_not be_valid }
   end
-  module_function :env=
+
+  context 'with a file path as the job_id' do
+    let(:job_id) { '../../../../../../../root' }
+
+    it { should_not be_valid }
+  end
+
+  context 'with a script as the env' do
+    let(:env) { '/usr/sbin/shutdown' }
+
+    it { should_not be_valid }
+  end
+
+  context 'with a string as arrguments' do
+    let(:arguments) { 'adds-nice-handling-to-internal-errors' }
+
+    it { should_not be_valid }
+  end
 end
+
