@@ -108,14 +108,11 @@ module FlightScheduler
       when 'JOB_CANCELLED'
         job_id = message[:job_id]
         Async.logger.info("Cancelling job:#{job_id}")
-        job_runner = FlightScheduler.app.job_registry.lookup_runner(job_id, 'BATCH')
-        if job_runner
-          job_runner.cancel
-          # The RUN_SCRIPT task will report back that the process has failed.
-          # We don't need to send any messages to the controller here.
-        end
-        FlightScheduler.app.job_registry.remove_job(job_id)
-
+        FlightScheduler.app.job_registry.lookup_runner(job_id, 'BATCH')&.cancel
+        # The RUN_SCRIPT task will report back that the process has failed.
+        # NOTE: The job is not removed here from the registry here as it *may*
+        #       not have finished. This allows for a subsequent cancellation request.
+        #       The job runner will preform the cleanup once the process has ended
       else
         Async.logger.info("Unknown message #{message}")
       end
