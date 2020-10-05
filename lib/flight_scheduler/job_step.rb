@@ -26,7 +26,17 @@
 #==============================================================================
 
 module FlightScheduler
-  class JobStep < Struct.new(:job, :id, :path, :arguments)
+  class JobStep
+    attr_reader :job, :id, :path, :arguments
+
+    def initialize(job, id, path, arguments, pty)
+      @job = job
+      @id = id
+      @path = path
+      @arguments = arguments
+      @pty = pty
+    end
+
     # Checks the various parameters are in the correct format before running
     # This is to prevent rogue data being passed Process.spawn or rm -f
     def valid?
@@ -34,6 +44,10 @@ module FlightScheduler
       return false unless path.is_a? String
       return false unless arguments.is_a? Array
       true
+    end
+
+    def pty?
+      !!@pty
     end
   end
 end

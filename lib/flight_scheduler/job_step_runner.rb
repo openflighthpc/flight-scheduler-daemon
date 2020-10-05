@@ -38,8 +38,6 @@ module FlightScheduler
   #   client.
   #
   class JobStepRunner
-    attr_reader :output
-
     def initialize(step)
       @step = step
       @job = @step.job
@@ -75,46 +73,35 @@ module FlightScheduler
 
       FlightScheduler.app.job_registry.add_runner(@job.id, @step.id, self)
       @task = Async do |task|
-        input_pipe, output_pipe = Async::IO.pipe
         # Fork to create the child process [Non Blocking]
         @child_pid = Kernel.fork do
-          input_pipe.close
           # Become the requested user and session leader
           Process::Sys.setgid(@job.gid)
           Process::Sys.setuid(@job.username)
           Process.setsid
 
-          opts = {
-            [:out, :err] => output_pipe.io,
-            unsetenv_others: true,
-          }
-
-          Dir.chdir(@job.working_dir)
-          # Exec into the job command
-          Kernel.exec(@job.env, @step.path, *@step.arguments, **opts)
+          stepd = Stepd.new(@job, @step)
+          stepd.run
         end
-        output_pipe.close
 
         # Loop asynchronously until the child is finished
         until out = Process.wait2(@child_pid, Process::WNOHANG) do
           task.yield
         end
         @status = out.last
-        @output = input_pipe.read
 
         # Reset the child_pid, this prevents cancel killing other processes
         # which might spawn with the same PID
         @child_pid = nil
       ensure
         FlightScheduler.app.job_registry.remove_runner(@job.id, @step.id)
-        input_pipe&.close
       end
     end
 
     # Kills the associated subprocess
     def cancel
       return unless @child_pid
-      Kernel.kill('SIGTERM', @child_pid)
+      Process.kill('SIGTERM', @child_pid)
     rescue Errno::ESRCH
       # NOOP - Don't worry if the process has already finished
     end
