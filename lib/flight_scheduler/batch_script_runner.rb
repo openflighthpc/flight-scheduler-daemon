@@ -107,6 +107,7 @@ module FlightScheduler
         @child_pid = nil
       ensure
         FlightScheduler.app.job_registry.remove_runner(@job.id, 'BATCH')
+        FlightScheduler.app.job_registry.remove_job(@job.id)
         @script.remove
       end
     end

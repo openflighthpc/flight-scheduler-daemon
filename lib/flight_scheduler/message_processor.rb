@@ -109,9 +109,12 @@ module FlightScheduler
         job_id = message[:job_id]
         Async.logger.info("Cancelling job:#{job_id}")
         job_runner = FlightScheduler.app.job_registry.lookup_runner(job_id, 'BATCH')
-        job_runner.cancel if job_runner
-        # The JOB_ALLOCATED task will report back that the process has failed.
-        # We don't need to send any messages to the controller here.
+        if job_runner
+          job_runner.cancel
+          # The RUN_SCRIPT task will report back that the process has failed.
+          # We don't need to send any messages to the controller here.
+        end
+        FlightScheduler.app.job_registry.remove_job(job_id)
 
       else
         Async.logger.info("Unknown message #{message}")
