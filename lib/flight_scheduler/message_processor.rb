@@ -30,6 +30,9 @@ module FlightScheduler
   # Process incoming messages and send responses.
   #
   class MessageProcessor
+    # TODO: Remove the particular instance of connection as it might drop out
+    # during long running operations. Instead use MessageSender which polls for
+    # the currently open connection
     def initialize(connection)
       @connection = connection
     end
