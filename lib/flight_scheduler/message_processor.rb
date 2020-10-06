@@ -159,10 +159,10 @@ module FlightScheduler
         end
 
       when 'JOB_DEALLOCATED'
+        job_id = message[:job_id]
         Async.logger.info("Deallocating job:#{job_id}")
 
         # Remove the job to prevent any further job steps
-        job_id = message[:job_id]
         FlightScheduler.app.job_registry.remove_job(job_id)
 
         # Report back when all the runners have stop
