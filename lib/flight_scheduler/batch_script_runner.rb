@@ -98,7 +98,7 @@ module FlightScheduler
 
         # Loop asynchronously until the child is finished
         until out = Process.wait2(@child_pid, Process::WNOHANG) do
-          task.yield
+          task.sleep 1
         end
         @status = out.last
 
