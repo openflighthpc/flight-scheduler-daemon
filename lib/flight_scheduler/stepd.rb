@@ -34,17 +34,27 @@ module FlightScheduler
       @job = job
       @step = step
       @address = 3608
+      @received_connection = false
     end
 
     def run
-      if @step.pty?
-        run_step_pty
-      else
-        run_step
+      run_step do |read, write, child_pid|
+        io_thread = connect_std_streams(read, write, child_pid)
+        wait_for_child(child_pid, sleep_on_exit: !@step.pty?)
+        wait_for_connection
+        io_thread.kill
       end
     end
 
     private
+
+    def run_step(&block)
+      if @step.pty?
+        run_step_pty(&block)
+      else
+        run_step_no_pty(&block)
+      end
+    end
 
     def run_step_pty
       opts = {
@@ -57,7 +67,7 @@ module FlightScheduler
       end
     end
 
-    def run_step
+    def run_step_no_pty
       input_rd, input_wr = IO.pipe
       output_rd, output_wr = IO.pipe
       child_pid = Kernel.fork do
@@ -73,47 +83,90 @@ module FlightScheduler
       end
       input_rd.close
       output_wr.close
-      connect_std_streams(output_rd, input_wr, child_pid, post_child_exit_sleep: true)
+
+      yield output_rd, input_wr, child_pid
     end
 
+    def wait_for_child(child_pid, sleep_on_exit:)
+      Async.logger.info("stepd: waiting on child_pid:#{child_pid}")
+      Process.wait(child_pid)
+      Async.logger.debug("stepd: done waiting on child_pid:#{child_pid}")
 
-    def connect_std_streams(output_rd, input_wr, child_pid, post_child_exit_sleep: false)
-      server = TCPServer.new(@address)
-      begin
-        Async.logger.info("stepd: listening on #{@address}")
-        connection = server.accept
-        Async.logger.info("stepd: received connection")
-        output_thread = create_output_thread(output_rd, connection)
-        input_thread = create_input_thread(input_wr, connection)
+      if sleep_on_exit
+        # FSR we need to sleep here to allow the output to be sent across the
+        # network reliably.
+        sleep 0.1
+      end
+    end
 
-        Async.logger.info("stepd: waiting on child_pid:#{child_pid}")
-        Process.wait(child_pid)
-        Async.logger.debug("stepd: done waiting on child_pid:#{child_pid}")
-
-        if post_child_exit_sleep
-          # FSR we need to sleep here to allow the output to be sent across the
-          # network reliably.
+    def wait_for_connection
+      # If we haven't yet received a connection, it may be because we're
+      # running a very quick command, which doesn't produce enough output to
+      # block on a full output pipe.  Examples are `hostname` or `date`.
+      #
+      # We should wait a while longer in case a connection is soon to be
+      # established.  If a connection is established we can assume that the
+      # small amount of ouput is sent very quickly.
+      #
+      # If we don't receive a connection within max_sleep seconds, we're
+      # unlikely to receive one at all.  The output will be lost.
+      max_sleep = 5
+      current_sleep = 0
+      unless @received_connection
+        loop do
+          current_sleep += 0.1
           sleep 0.1
+          if current_sleep >= max_sleep
+            Async.logger.debug("No connection received. Giving up")
+            break
+          end
+          if @received_connection
+            # One additional sleep to make sure we have time to send all
+            # output.
+            sleep 0.1
+            break
+          end
         end
+      end
+    end
 
-        # The process has finished running. We kill both the input and output
-        # threads.  We also join against them to ensure that we don't close
-        # the connection until the threads have performed their cleanup.
-        # Without this not all output is sent across the network reliably.
-        output_thread.kill
-        input_thread.kill
-        input_thread.join
-        output_thread.join
-      rescue
-        Async.logger.warn("stepd: Error running stepd #{$!.message}")
-      ensure
-        connection.close if connection
-        Async.logger.info("stepd: connection closed")
+    def connect_std_streams(output_rd, input_wr, child_pid)
+      server = TCPServer.new(@address)
+      Thread.new do
+        output_thread = nil
+        input_thread = nil
         begin
-          Async.logger.debug("stepd: killing child_pid:#{child_pid}")
-          Process.kill('SIGTERM', child_pid)
-        rescue Errno::ESRCH
-          # NOOP - Don't worry if the process has already finished
+          Async.logger.info("stepd: listening on #{server.addr[2]}:#{server.addr[1]}")
+          connection = server.accept
+          @received_connection = true
+          Async.logger.info("stepd: received connection")
+          output_thread = create_output_thread(output_rd, connection)
+          input_thread = create_input_thread(input_wr, connection)
+          output_thread.join
+          input_thread.join
+        rescue
+          Async.logger.warn("stepd: Error running stepd #{$!.message} -- #{$!.class.name}")
+        ensure
+          begin
+            # We kill both the input and output threads.  We also join against
+            # them to ensure that we don't close the connection until the threads
+            # have performed their cleanup.  Without this not all output is sent
+            # across the network reliably.
+            output_thread.kill if output_thread
+            input_thread.kill if input_thread
+            output_thread.join if output_thread
+            input_thread.join if input_thread
+            connection.close if connection
+            Async.logger.info("stepd: connection closed")
+            begin
+              Async.logger.debug("stepd: killing child_pid:#{child_pid}")
+              Process.kill('SIGTERM', child_pid)
+            rescue Errno::ESRCH
+              # NOOP - Don't worry if the process has already finished
+            end
+          rescue
+            Async.logger.warn("stepd: Unexpected error when cleaning up #{$!.message}")
+          end
         end
       end
     end
