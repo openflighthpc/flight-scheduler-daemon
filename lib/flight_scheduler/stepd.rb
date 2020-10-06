@@ -33,13 +33,13 @@ module FlightScheduler
     def initialize(job, step)
       @job = job
       @step = step
-      @address = 3608
       @received_connection = false
     end
 
     def run
       run_step do |read, write, child_pid|
         io_thread = connect_std_streams(read, write, child_pid)
+        notify_controller
         wait_for_child(child_pid, sleep_on_exit: !@step.pty?)
         wait_for_connection
         io_thread.kill
@@ -63,7 +63,7 @@ module FlightScheduler
       }
       env = @job.env.merge({'TERM' => 'xterm-256color'})
       PTY.spawn(env, @step.path, *@step.arguments, **opts) do |read, write, pid|
-        connect_std_streams(read, write, pid, post_child_exit_sleep: false)
+        yield read, write, pid
       end
     end
 
@@ -131,7 +131,8 @@ module FlightScheduler
     end
 
     def connect_std_streams(output_rd, input_wr, child_pid)
-      server = TCPServer.new(@address)
+      server = TCPServer.new('0.0.0.0', 0)
+      @port = server.addr[1]
       Thread.new do
         output_thread = nil
         input_thread = nil
@@ -198,6 +199,15 @@ module FlightScheduler
           Async.logger.debug("stepd: input thread exited")
         end
       end
+    end
+
+    def notify_controller
+      MessageSender.send({
+        command: 'RUN_STEP_STARTED',
+        job_id: @job.id,
+        port: @port,
+        step_id: @step.id,
+      })
     end
   end
 end
