@@ -141,10 +141,10 @@ module FlightScheduler
         end
 
       when 'JOB_CANCELLED'
+        job_id = message[:job_id]
         Async.logger.info("Cancelling job:#{job_id}")
 
         # Deallocate the job to prevent any further job steps
-        job_id = message[:job_id]
         FlightScheduler.app.job_registry.deallocate_job(job_id)
 
         Async do |task|
