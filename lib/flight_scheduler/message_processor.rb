@@ -133,7 +133,7 @@ module FlightScheduler
             Async.logger.info("Completed step for job #{job_id}")
             Async.logger.debug("Output: #{runner.output}")
             command = runner.success? ? 'RUN_STEP_COMPLETED' : 'RUN_STEP_FAILED'
-            @connection.write({command: command, job_id: job_id})
+            @connection.write({command: command, job_id: job_id, step_id: step_id})
             @connection.flush
           rescue
             error_handler.call
