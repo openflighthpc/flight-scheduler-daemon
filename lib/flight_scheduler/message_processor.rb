@@ -147,13 +147,17 @@ module FlightScheduler
         job_id = message[:job_id]
         FlightScheduler.app.job_registry.deallocate_job(job_id)
 
-        # Cancel all current runners
-        FlightScheduler.app.job_registry.lookup_runners(job_id).each do |_, runner|
-          runner.cancel
-        end
-
-        # Report back when all the runners have stop
         Async do |task|
+          # Allow other tasks to run a final time before cancelling
+          # This is a last attempt to collect any finished processes
+          task.yield
+
+          # Cancel all current runners
+          FlightScheduler.app.job_registry.lookup_runners(job_id).each do |_, runner|
+            runner.cancel
+          end
+
+          # Wait for the runners to finish and remove the job
           task.yield until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
           FlightScheduler.app.job_registry.remove_job(job_id)
           MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
