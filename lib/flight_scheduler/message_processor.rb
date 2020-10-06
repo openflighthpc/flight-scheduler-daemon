@@ -143,18 +143,19 @@ module FlightScheduler
       when 'JOB_CANCELLED'
         Async.logger.info("Cancelling job:#{job_id}")
 
-        # Remove the job to prevent any further job steps
+        # Deallocate the job to prevent any further job steps
         job_id = message[:job_id]
-        FlightScheduler.app.job_registry.remove_job(job_id)
+        FlightScheduler.app.job_registry.deallocate_job(job_id)
 
         # Cancel all current runners
-        FlightScheduler.app.job_registry.lookup_runners(job_id).each do |runner|
+        FlightScheduler.app.job_registry.lookup_runners(job_id).each do |_, runner|
           runner.cancel
         end
 
         # Report back when all the runners have stop
         Async do |task|
           task.yield until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
+          FlightScheduler.app.job_registry.remove_job(job_id)
           MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
         end
 
@@ -162,12 +163,13 @@ module FlightScheduler
         job_id = message[:job_id]
         Async.logger.info("Deallocating job:#{job_id}")
 
-        # Remove the job to prevent any further job steps
-        FlightScheduler.app.job_registry.remove_job(job_id)
+        # Deallocate the job to prevent any further job steps
+        FlightScheduler.app.job_registry.deallocate_job(job_id)
 
         # Report back when all the runners have stop
         Async do |task|
           task.yield until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
+          FlightScheduler.app.job_registry.remove_job(job_id)
           MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
         end
 
@@ -175,8 +177,9 @@ module FlightScheduler
         Async.logger.info("Unknown message #{message}")
       end
       Async.logger.debug("Processed message #{message.inspect}")
-    rescue
+    rescue => e
       Async.logger.warn("Error processing message #{$!.message}")
+      Async.logger.debug e.full_message
     end
   end
 end

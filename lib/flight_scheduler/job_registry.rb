@@ -40,6 +40,7 @@ module FlightScheduler
     class DuplicateJob < RuntimeError; end
     class DuplicateRunner < RuntimeError; end
     class UnknownJob < RuntimeError; end
+    class DeallocatedJob < RuntimeError; end
 
     def initialize
       @jobs = Concurrent::Hash.new
@@ -49,12 +50,13 @@ module FlightScheduler
       if @jobs[job_id]
         raise DuplicateJob, job_id
       end
-      @jobs[job_id] = { job: job, runners: Concurrent::Hash.new }
+      @jobs[job_id] = { job: job, runners: Concurrent::Hash.new, deallocated: false }
     end
 
     def add_runner(job_id, runner_id, runner)
       data = @jobs[job_id]
       raise UnknownJob, job_id if data.nil?
+      raise FrozenJob, job_id if data[:deallocated]
       runners = data[:runners]
       if runners[runner_id]
         raise DuplicateRunner, runner_id
@@ -72,6 +74,12 @@ module FlightScheduler
       data[:runners].delete(runner_id)
     end
 
+    def deallocate_job(job_id)
+      data = @jobs[job_id]
+      return if data.nil?
+      data[:deallocated] = true
+    end
+
     def lookup_job(job_id)
       data = @jobs[job_id]
       data.nil? ? nil : data[:job]
@@ -83,7 +91,7 @@ module FlightScheduler
 
     def lookup_runners(job_id)
       data = @jobs[job_id]
-      data.nil? ? [] : data[:runners].to_a.flatten
+      data.nil? ? [] : data[:runners].to_a
     end
 
     def lookup_runner(job_id, runner_id)
