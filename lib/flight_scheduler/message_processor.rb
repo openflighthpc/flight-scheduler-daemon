@@ -158,7 +158,7 @@ module FlightScheduler
           end
 
           # Wait for the runners to finish and remove the job
-          task.yield until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
+          task.sleep(0.1) until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
           FlightScheduler.app.job_registry.remove_job(job_id)
           MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
         end
@@ -172,7 +172,7 @@ module FlightScheduler
 
         # Report back when all the runners have stop
         Async do |task|
-          task.yield until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
+          task.sleep(0.1) until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
           FlightScheduler.app.job_registry.remove_job(job_id)
           MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
         end
