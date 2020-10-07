@@ -181,9 +181,9 @@ module FlightScheduler
         Async.logger.info("Unknown message #{message}")
       end
       Async.logger.debug("Processed message #{message.inspect}")
-    rescue => e
+    rescue
       Async.logger.warn("Error processing message #{$!.message}")
-      Async.logger.debug e.full_message
+      Async.logger.debug $!.full_message
     end
   end
 end
