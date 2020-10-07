@@ -30,10 +30,6 @@ module FlightScheduler
   # Process incoming messages and send responses.
   #
   class MessageProcessor
-    def initialize(connection)
-      @connection = connection
-    end
-
     def call(message)
       Async.logger.info("Processing message #{message.inspect}")
       command = message[:command]
@@ -50,8 +46,7 @@ module FlightScheduler
           FlightScheduler.app.job_registry.add_job(job.id, job)
         rescue
           Async.logger.info("Error configuring job #{job_id} #{$!.message}")
-          @connection.write({command: 'JOB_ALLOCATION_FAILED', job_id: job_id})
-          @connection.flush
+          MessageSender.send(command: 'JOB_ALLOCATION_FAILED', job_id: job_id)
         end
 
       when 'RUN_SCRIPT'
@@ -65,15 +60,14 @@ module FlightScheduler
         error_handler = lambda do
           Async.logger.info("Error running script job:#{job_id} #{$!.message}")
           if message[:array_job_id]
-            @connection.write({
+            MessageSender.send(
               command: 'NODE_FAILED_ARRAY_TASK',
               array_job_id: message[:array_job_id],
               array_task_id: message[:array_task_id],
-            })
+            )
           else
-            @connection.write({command: 'NODE_FAILED_JOB', job_id: job_id})
+            MessageSender.send(command: 'NODE_FAILED_JOB', job_id: job_id)
           end
-          @connection.flush
         end
         begin
           job = FlightScheduler.app.job_registry.lookup_job(job_id)
@@ -90,16 +84,15 @@ module FlightScheduler
               command = runner.success? ?
                 'NODE_COMPLETED_ARRAY_TASK' :
                 'NODE_FAILED_ARRAY_TASK'
-              @connection.write({
+              MessageSender.send(
                 command: command,
                 array_job_id: message[:array_job_id],
                 array_task_id: message[:array_task_id],
-              })
+              )
             else
               command = runner.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
-              @connection.write({command: command, job_id: job_id})
+              MessageSender.send(command: command, job_id: job_id)
             end
-            @connection.flush
           rescue
             error_handler.call
           end
@@ -114,8 +107,7 @@ module FlightScheduler
         Async.logger.debug("Running step:#{step_id} for job:#{job_id} path:#{path} arguments:#{arguments}")
         error_handler = lambda do
           Async.logger.info("Error running step:#{step_id} for job:#{job_id} #{$!.message}")
-          @connection.write({command: 'RUN_STEP_FAILED', job_id: job_id, step_id: step_id})
-          @connection.flush
+          MessageSender.send(command: 'RUN_STEP_FAILED', job_id: job_id, step_id: step_id)
         end
         begin
           job = FlightScheduler.app.job_registry.lookup_job!(job_id)
@@ -130,8 +122,7 @@ module FlightScheduler
             Async.logger.info("Completed step for job #{job_id}")
             Async.logger.debug("Output: #{runner.output}")
             command = runner.success? ? 'RUN_STEP_COMPLETED' : 'RUN_STEP_FAILED'
-            @connection.write({command: command, job_id: job_id})
-            @connection.flush
+            MessageSender.send(command: command, job_id: job_id, step_id: step_id)
           rescue
             error_handler.call
           end
@@ -140,13 +131,39 @@ module FlightScheduler
       when 'JOB_CANCELLED'
         job_id = message[:job_id]
         Async.logger.info("Cancelling job:#{job_id}")
-        job_runner = FlightScheduler.app.job_registry.lookup_runner(job_id, 'BATCH')
-        if job_runner
-          job_runner.cancel
-          # The RUN_SCRIPT task will report back that the process has failed.
-          # We don't need to send any messages to the controller here.
+
+        # Deallocate the job to prevent any further job steps
+        FlightScheduler.app.job_registry.deallocate_job(job_id)
+
+        Async do |task|
+          # Allow other tasks to run a final time before cancelling
+          # This is a last attempt to collect any finished processes
+          task.yield
+
+          # Cancel all current runners
+          FlightScheduler.app.job_registry.lookup_runners(job_id).each do |_, runner|
+            runner.cancel
+          end
+
+          # Wait for the runners to finish and remove the job
+          task.sleep(0.1) until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
+          FlightScheduler.app.job_registry.remove_job(job_id)
+          MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
         end
-        FlightScheduler.app.job_registry.remove_job(job_id)
+
+      when 'JOB_DEALLOCATED'
+        job_id = message[:job_id]
+        Async.logger.info("Deallocating job:#{job_id}")
+
+        # Deallocate the job to prevent any further job steps
+        FlightScheduler.app.job_registry.deallocate_job(job_id)
+
+        # Report back when all the runners have stop
+        Async do |task|
+          task.sleep(0.1) until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
+          FlightScheduler.app.job_registry.remove_job(job_id)
+          MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
+        end
 
       else
         Async.logger.info("Unknown message #{message}")
@@ -154,6 +171,7 @@ module FlightScheduler
       Async.logger.debug("Processed message #{message.inspect}")
     rescue
       Async.logger.warn("Error processing message #{$!.message}")
+      Async.logger.debug $!.full_message
     end
   end
 end

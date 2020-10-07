@@ -48,6 +48,14 @@ module FlightScheduler
       @root ||= Pathname.new(__dir__).join('../../').expand_path
     end
 
+    def connection
+      if @connection && @connection.closed?
+        nil
+      elsif @connection
+        @connection
+      end
+    end
+
     def run
       Async do |task|
         controller_url = FlightScheduler.app.config.controller_url
@@ -58,7 +66,8 @@ module FlightScheduler
           Async.logger.info("Connecting to #{controller_url.inspect}")
           Async::WebSocket::Client.connect(endpoint) do |connection|
             Async.logger.info("Connected to #{controller_url.inspect}")
-            processor = MessageProcessor.new(connection)
+            @connection = connection
+            processor = MessageProcessor.new
             connection.write({ command: "CONNECTED", node: node })
             connection.flush
             while message = connection.read

@@ -25,39 +25,38 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-require "active_support/string_inquirer"
-require 'flight_scheduler/errors'
-
 module FlightScheduler
-  autoload(:Application, 'flight_scheduler/application')
-  autoload(:BatchScript, 'flight_scheduler/batch_script')
-  autoload(:Configuration, 'flight_scheduler/configuration')
-  autoload(:Job, 'flight_scheduler/job')
-  autoload(:JobRegistry, 'flight_scheduler/job_registry')
-  autoload(:BatchScriptRunner, 'flight_scheduler/batch_script_runner')
-  autoload(:JobStep, 'flight_scheduler/job_step')
-  autoload(:JobStepRunner, 'flight_scheduler/job_step_runner')
-  autoload(:MessageProcessor, 'flight_scheduler/message_processor')
-  autoload(:MessageSender, 'flight_scheduler/message_sender')
+  class MessageSender
+    def self.send(**opts)
+      new(**opts).tap(&:write)
+    end
 
-  VERSION = "0.0.1"
+    attr_reader :opts, :task
 
-  def app
-    @app ||= Application.new(
-      job_registry: JobRegistry.new,
-    )
+    def initialize(**opts)
+      @opts = opts
+    end
+
+    def wait
+      task.wait
+    end
+
+    def write
+      Async do |t|
+        @task = t
+
+        # Wait until a connection becomes available
+        connection = nil
+        until connection = FlightScheduler.app.connection
+          task.sleep(0.1)
+        end
+
+        # Send the message
+        connection.write(**opts)
+
+        # Flush the message
+        connection.flush
+      end
+    end
   end
-  module_function :app
-
-  def env
-    @env ||= ActiveSupport::StringInquirer.new(
-      ENV["RACK_ENV"].presence || "development"
-    )
-  end
-  module_function :env
-
-  def env=(environment)
-    @env = ActiveSupport::StringInquirer.new(environment)
-  end
-  module_function :env=
 end
