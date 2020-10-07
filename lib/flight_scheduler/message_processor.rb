@@ -30,13 +30,6 @@ module FlightScheduler
   # Process incoming messages and send responses.
   #
   class MessageProcessor
-    # TODO: Remove the particular instance of connection as it might drop out
-    # during long running operations. Instead use MessageSender which polls for
-    # the currently open connection
-    def initialize(connection)
-      @connection = connection
-    end
-
     def call(message)
       Async.logger.info("Processing message #{message.inspect}")
       command = message[:command]
@@ -53,8 +46,7 @@ module FlightScheduler
           FlightScheduler.app.job_registry.add_job(job.id, job)
         rescue
           Async.logger.info("Error configuring job #{job_id} #{$!.message}")
-          @connection.write({command: 'JOB_ALLOCATION_FAILED', job_id: job_id})
-          @connection.flush
+          MessageSender.send(command: 'JOB_ALLOCATION_FAILED', job_id: job_id)
         end
 
       when 'RUN_SCRIPT'
@@ -68,15 +60,14 @@ module FlightScheduler
         error_handler = lambda do
           Async.logger.info("Error running script job:#{job_id} #{$!.message}")
           if message[:array_job_id]
-            @connection.write({
+            MessageSender.send(
               command: 'NODE_FAILED_ARRAY_TASK',
               array_job_id: message[:array_job_id],
               array_task_id: message[:array_task_id],
-            })
+            )
           else
-            @connection.write({command: 'NODE_FAILED_JOB', job_id: job_id})
+            MessageSender.send(command: 'NODE_FAILED_JOB', job_id: job_id)
           end
-          @connection.flush
         end
         begin
           job = FlightScheduler.app.job_registry.lookup_job(job_id)
@@ -93,16 +84,15 @@ module FlightScheduler
               command = runner.success? ?
                 'NODE_COMPLETED_ARRAY_TASK' :
                 'NODE_FAILED_ARRAY_TASK'
-              @connection.write({
+              MessageSender.send(
                 command: command,
                 array_job_id: message[:array_job_id],
                 array_task_id: message[:array_task_id],
-              })
+              )
             else
               command = runner.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
-              @connection.write({command: command, job_id: job_id})
+              MessageSender.send(command: command, job_id: job_id)
             end
-            @connection.flush
           rescue
             error_handler.call
           end
@@ -117,8 +107,7 @@ module FlightScheduler
         Async.logger.debug("Running step:#{step_id} for job:#{job_id} path:#{path} arguments:#{arguments}")
         error_handler = lambda do
           Async.logger.info("Error running step:#{step_id} for job:#{job_id} #{$!.message}")
-          @connection.write({command: 'RUN_STEP_FAILED', job_id: job_id, step_id: step_id})
-          @connection.flush
+          MessageSender.send(command: 'RUN_STEP_FAILED', job_id: job_id, step_id: step_id)
         end
         begin
           job = FlightScheduler.app.job_registry.lookup_job!(job_id)
@@ -133,8 +122,7 @@ module FlightScheduler
             Async.logger.info("Completed step for job #{job_id}")
             Async.logger.debug("Output: #{runner.output}")
             command = runner.success? ? 'RUN_STEP_COMPLETED' : 'RUN_STEP_FAILED'
-            @connection.write({command: command, job_id: job_id, step_id: step_id})
-            @connection.flush
+            MessageSender.send(command: command, job_id: job_id, step_id: step_id)
           rescue
             error_handler.call
           end
