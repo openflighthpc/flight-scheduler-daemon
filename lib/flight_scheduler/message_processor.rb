@@ -102,6 +102,7 @@ module FlightScheduler
         arguments = message[:arguments]
         job_id    = message[:job_id]
         path      = message[:path]
+        pty       = message[:pty]
         step_id   = message[:step_id]
 
         Async.logger.debug("Running step:#{step_id} for job:#{job_id} path:#{path} arguments:#{arguments}")
@@ -111,7 +112,7 @@ module FlightScheduler
         end
         begin
           job = FlightScheduler.app.job_registry.lookup_job!(job_id)
-          step = JobStep.new(job, step_id, path, arguments)
+          step = JobStep.new(job, step_id, path, arguments, pty)
           runner = JobStepRunner.new(step)
           runner.run
         rescue
@@ -119,8 +120,7 @@ module FlightScheduler
         else
           Async do
             runner.wait
-            Async.logger.info("Completed step for job #{job_id}")
-            Async.logger.debug("Output: #{runner.output}")
+            Async.logger.info("Completed step:#{step_id} for job #{job_id}")
             command = runner.success? ? 'RUN_STEP_COMPLETED' : 'RUN_STEP_FAILED'
             MessageSender.send(command: command, job_id: job_id, step_id: step_id)
           rescue
