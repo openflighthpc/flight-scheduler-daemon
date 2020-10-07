@@ -56,7 +56,7 @@ module FlightScheduler
     def add_runner(job_id, runner_id, runner)
       data = @jobs[job_id]
       raise UnknownJob, job_id if data.nil?
-      raise FrozenJob, job_id if data[:deallocated]
+      raise DeallocatedJob, job_id if data[:deallocated]
       runners = data[:runners]
       if runners[runner_id]
         raise DuplicateRunner, runner_id
