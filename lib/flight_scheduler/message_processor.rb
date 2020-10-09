@@ -45,7 +45,7 @@ module FlightScheduler
           job = FlightScheduler::Job.new(job_id, env, username)
           FlightScheduler.app.job_registry.add_job(job.id, job)
         rescue
-          Async.logger.info("Error configuring job #{job_id} #{$!.message}")
+          Async.logger.warn("Error configuring job #{job_id} #{$!.message}")
           MessageSender.send(command: 'JOB_ALLOCATION_FAILED', job_id: job_id)
         end
 
@@ -58,7 +58,7 @@ module FlightScheduler
 
         Async.logger.debug("Running script for job:#{job_id} script:#{script_body} arguments:#{arguments}")
         error_handler = lambda do
-          Async.logger.info("Error running script job:#{job_id} #{$!.message}")
+          Async.logger.warn("Error running script job:#{job_id} #{$!.message}")
           if message[:array_job_id]
             MessageSender.send(
               command: 'NODE_FAILED_ARRAY_TASK',
@@ -107,7 +107,7 @@ module FlightScheduler
 
         Async.logger.debug("Running step:#{step_id} for job:#{job_id} path:#{path} arguments:#{arguments}")
         error_handler = lambda do
-          Async.logger.info("Error running step:#{step_id} for job:#{job_id} #{$!.message}")
+          Async.logger.warn("Error running step:#{step_id} for job:#{job_id} #{$!.message}")
           MessageSender.send(command: 'RUN_STEP_FAILED', job_id: job_id, step_id: step_id)
         end
         begin
