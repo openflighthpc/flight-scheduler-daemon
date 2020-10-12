@@ -25,41 +25,44 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-require "active_support/string_inquirer"
-require 'flight_scheduler/errors'
+require 'active_support/core_ext/string/inflections'
+require 'timeout'
 
 module FlightScheduler
-  autoload(:Application, 'flight_scheduler/application')
-  autoload(:Auth, 'flight_scheduler/auth')
-  autoload(:BatchScript, 'flight_scheduler/batch_script')
-  autoload(:BatchScriptRunner, 'flight_scheduler/batch_script_runner')
-  autoload(:Configuration, 'flight_scheduler/configuration')
-  autoload(:Job, 'flight_scheduler/job')
-  autoload(:JobRegistry, 'flight_scheduler/job_registry')
-  autoload(:JobStep, 'flight_scheduler/job_step')
-  autoload(:JobStepRunner, 'flight_scheduler/job_step_runner')
-  autoload(:MessageProcessor, 'flight_scheduler/message_processor')
-  autoload(:MessageSender, 'flight_scheduler/message_sender')
-  autoload(:Stepd, 'flight_scheduler/stepd')
+  module Auth
+    class AuthenticationError < RuntimeError; end
+    class UnknownAuthType < AuthenticationError; end
 
-  VERSION = "0.0.1"
+    # Return an auth token identifying the node this daemon is running on.
+    def self.token
+      auth_type = FlightScheduler.app.config.auth_type
+      const_string = auth_type.classify
+      auth_type = const_get(const_string)
+    rescue NameError
+      Async.logger.warn("Auth type not found: #{self}::#{const_string}")
+      raise UnknownAuthType, "Unknown auth type #{name}"
+    else
+      auth_type.call
+    end
 
-  def app
-    @app ||= Application.new(
-      job_registry: JobRegistry.new,
-    )
+    module Basic
+      def self.call
+        # This is the no-auth option.  Just return the node name.
+        FlightScheduler.app.config.node_name
+      end
+    end
+
+    module Munge
+      def self.call
+        payload = "NODE_NAME: #{FlightScheduler.app.config.node_name}"
+        token = Timeout.timeout(2) { system(['munge', '-s', payload]) }
+        if token.nil?
+          raise AuthenticationError, "Unable to obtain munge token"
+        end
+        token
+      rescue Timeout::Error
+        raise AuthenticationError, "Unable to obtain munge token"
+      end
+    end
   end
-  module_function :app
-
-  def env
-    @env ||= ActiveSupport::StringInquirer.new(
-      ENV["RACK_ENV"].presence || "development"
-    )
-  end
-  module_function :env
-
-  def env=(environment)
-    @env = ActiveSupport::StringInquirer.new(environment)
-  end
-  module_function :env=
 end

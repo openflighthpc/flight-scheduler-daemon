@@ -60,7 +60,7 @@ module FlightScheduler
       Async do |task|
         controller_url = FlightScheduler.app.config.controller_url
         endpoint = Async::HTTP::Endpoint.parse(controller_url)
-        node = FlightScheduler.app.config.node_name
+        auth_token = FlightScheduler::Auth.token
 
         loop do
           Async.logger.info("Connecting to #{controller_url.inspect}")
@@ -68,7 +68,7 @@ module FlightScheduler
             Async.logger.info("Connected to #{controller_url.inspect}")
             @connection = connection
             processor = MessageProcessor.new
-            connection.write({ command: "CONNECTED", node: node })
+            connection.write({command: "CONNECTED", auth_token: auth_token})
             connection.flush
             while message = connection.read
               processor.call(message)
