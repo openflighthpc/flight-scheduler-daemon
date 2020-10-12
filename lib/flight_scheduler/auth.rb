@@ -27,6 +27,7 @@
 
 require 'active_support/core_ext/string/inflections'
 require 'timeout'
+require 'open3'
 
 module FlightScheduler
   module Auth
@@ -55,7 +56,7 @@ module FlightScheduler
     module Munge
       def self.call
         payload = "NODE_NAME: #{FlightScheduler.app.config.node_name}"
-        token = Timeout.timeout(2) {
+        token, _status = Timeout.timeout(2) {
           Open3.capture2('munge', stdin_data: payload)
         }
         if token.nil?
