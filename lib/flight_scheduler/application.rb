@@ -62,9 +62,12 @@ module FlightScheduler
         endpoint = Async::HTTP::Endpoint.parse(controller_url)
         auth_token = FlightScheduler::Auth.token
 
+        Async.logger.info("Daemon started")
         loop do
-          Async.logger.info("Connecting to #{controller_url.inspect}")
+          error_log_level = :debug
+          Async.logger.debug("Connecting to #{controller_url.inspect}")
           Async::WebSocket::Client.connect(endpoint) do |connection|
+            error_log_level = :warn
             Async.logger.info("Connected to #{controller_url.inspect}")
             @connection = connection
             processor = MessageProcessor.new
@@ -77,7 +80,7 @@ module FlightScheduler
             Async.logger.info("Connection closed")
           end
         rescue EOFError, Errno::ECONNREFUSED
-          Async.logger.info("Connection closed: #{$!.message}")
+          Async.logger.send(error_log_level, "Connection closed: #{$!.message}")
           # XXX Incremental backoff.
           sleep 1
           retry
