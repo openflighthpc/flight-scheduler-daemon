@@ -55,7 +55,9 @@ module FlightScheduler
     module Munge
       def self.call
         payload = "NODE_NAME: #{FlightScheduler.app.config.node_name}"
-        token = Timeout.timeout(2) { system(['munge', '-s', payload]) }
+        token = Timeout.timeout(2) {
+          Open3.capture2('munge', stdin_data: payload)
+        }
         if token.nil?
           raise AuthenticationError, "Unable to obtain munge token"
         end
