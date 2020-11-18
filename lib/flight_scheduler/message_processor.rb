@@ -160,6 +160,15 @@ module FlightScheduler
 
         # Report back when all the runners have stop
         Async do |task|
+          # Cancel any current runners.
+          #
+          # There shouldn't be any for successfully completed jobs.  For
+          # failed jobs, there could be job step runners which have gotten
+          # stuck for reasons
+          FlightScheduler.app.job_registry.lookup_runners(job_id).each do |_, runner|
+            runner.cancel
+          end
+
           task.sleep(0.1) until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
           FlightScheduler.app.job_registry.remove_job(job_id)
           MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
