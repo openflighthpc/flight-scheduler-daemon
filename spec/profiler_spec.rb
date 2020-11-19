@@ -62,4 +62,11 @@ RSpec.describe FlightScheduler::Profiler do
 
     include_examples 'core profiler spec'
   end
+
+  # Tests multi-core cpus with hyper-threading
+  context 'with a dell-xps13 machine' do
+    let(:name) { 'dell-xps13' }
+
+    include_examples 'core profiler spec'
+  end
 end

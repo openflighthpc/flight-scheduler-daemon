@@ -62,8 +62,26 @@ module FlightScheduler
       ERROR
     end
 
+    # Currently assumes hyperthreading is the same as additional cores
+    # This ensures consistency with the output form nproc
+    # Consider revisiting
     def cpus
-      parser.xpath('//node[starts-with(@id, "cpu")]').length
+      parser.xpath('//node[starts-with(@id, "cpu")]').reduce(0) do |sum, cpu|
+        config = cpu.xpath('configuration/setting').each_with_object({}) do |config, memo|
+          key, value = config.values
+          memo[key] = value.to_i
+        end
+
+        if config.key?('threads')
+          sum += config['threads']
+        elsif config.key?('enabledcores')
+          sum += config['enabledcores']
+        elsif config.key?('cores')
+          sum += config['cores']
+        else
+          sum += 1
+        end
+      end
     end
 
     def gpus
