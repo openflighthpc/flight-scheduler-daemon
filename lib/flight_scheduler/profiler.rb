@@ -29,9 +29,15 @@ require 'nokogiri'
 
 module FlightScheduler
   class Profiler
+    MEM_TOTAL_REGEX = /^MemTotal:\s*(?<size>\d+)\s*kB$/
+
     def self.run_lshw_xml
       # TODO: Run the lshw command here
       ''
+    end
+
+    def self.read_meminfo
+      File.read('/proc/meminfo')
     end
 
     def cpus
@@ -40,6 +46,15 @@ module FlightScheduler
 
     def gpus
       parser.xpath('//node[starts-with(@id, "display")]').length
+    end
+
+    # NOTE: The memory info comes form /proc/meminfo as lshw is unreliable
+    #       The meminfo *says* its unit is kB (1000 B) but it's actually KiB (1024 B)
+    #       https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/deployment_guide/s2-proc-meminfo
+    def memory
+      @memory ||= MEM_TOTAL_REGEX.match(self.class.read_meminfo)
+                                 .named_captures['size']
+                                 .to_i * 1024
     end
 
     private

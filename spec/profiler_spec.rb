@@ -30,16 +30,18 @@ require 'yaml'
 
 RSpec.describe FlightScheduler::Profiler do
   shared_examples 'core profiler spec' do
-    let(:xml)       { file_fixture("lshw/#{name}.xml").read }
+    let(:xml)       { file_fixture("profiler/#{name}.xml").read }
+    let(:meminfo)   { file_fixture("profiler/#{name}.meminfo").read }
     let(:metadata)  do
       # The metadata is used to configure the spec to the instance,
       # it is not part of the Profiler itself
-      YAML.load(file_fixture("lshw/#{name}.metadata.yaml").read, symbolize_names: true)
+      YAML.load(file_fixture("profiler/#{name}.metadata.yaml").read, symbolize_names: true)
     end
     subject         { described_class.new }
 
     before do
       allow(described_class).to receive(:run_lshw_xml).and_return(xml)
+      allow(described_class).to receive(:read_meminfo).and_return(meminfo)
     end
 
     describe '#cpus' do
@@ -48,6 +50,10 @@ RSpec.describe FlightScheduler::Profiler do
 
     describe '#gpus' do
       it { expect(subject.gpus).to eq(metadata[:gpus]) }
+    end
+
+    describe '#memory' do
+      it { expect(subject.memory).to eq(metadata[:memory]) }
     end
   end
 

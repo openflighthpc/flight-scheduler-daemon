@@ -1,4 +1,5 @@
 cpus: 64
+memory: 473392132096
 
 # The Azure documentation says there are four GPUs for this type of machine
 # However on inspection of lshw output, there are actually five:
