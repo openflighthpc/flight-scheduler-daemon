@@ -25,50 +25,27 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-require 'spec_helper'
-require 'securerandom'
+require 'nokogiri'
 
-RSpec.describe FlightScheduler::BatchScriptRunner do
-  let(:job_id) { SecureRandom.uuid }
-  let(:env) { {} }
-  let(:script_body) do
-    <<~SCRIPT
-      #!/bin/bash
-      echo 'test'
-    SCRIPT
-  end
-  let(:arguments) { [] }
+module FlightScheduler
+  class Profiler
+    def self.run_lshw_xml
+      # TODO: Run the lshw command here
+      ''
+    end
 
-  subject do
-    described_class.new(
-      job_id, env, script_body, arguments, Etc.getlogin, '/tmp/foo', '/tmp/foo'
-    )
-  end
+    def cpus
+      parser.xpath('//node[starts-with(@id, "cpu")]').length
+    end
 
-  xit { should be_valid }
+    def gpus
+      parser.xpath('//node[starts-with(@id, "display")]').length
+    end
 
-  context 'with a nil job_id' do
-    let(:job_id) { nil }
+    private
 
-    xit { should_not be_valid }
-  end
-
-  context 'with a file path as the job_id' do
-    let(:job_id) { '../../../../../../../root' }
-
-    xit { should_not be_valid }
-  end
-
-  context 'with a script as the env' do
-    let(:env) { '/usr/sbin/shutdown' }
-
-    xit { should_not be_valid }
-  end
-
-  context 'with a string as arrguments' do
-    let(:arguments) { 'adds-nice-handling-to-internal-errors' }
-
-    xit { should_not be_valid }
+    def parser
+      @parser ||= Nokogiri::XML(self.class.run_lshw_xml)
+    end
   end
 end
-

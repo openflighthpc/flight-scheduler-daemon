@@ -26,49 +26,34 @@
 #==============================================================================
 
 require 'spec_helper'
-require 'securerandom'
+require 'yaml'
 
-RSpec.describe FlightScheduler::BatchScriptRunner do
-  let(:job_id) { SecureRandom.uuid }
-  let(:env) { {} }
-  let(:script_body) do
-    <<~SCRIPT
-      #!/bin/bash
-      echo 'test'
-    SCRIPT
-  end
-  let(:arguments) { [] }
+RSpec.describe FlightScheduler::Profiler do
+  shared_examples 'core profiler spec' do
+    let(:xml)       { file_fixture("lshw/#{name}.xml").read }
+    let(:metadata)  do
+      # The metadata is used to configure the spec to the instance,
+      # it is not part of the Profiler itself
+      YAML.load(file_fixture("lshw/#{name}.metadata.yaml").read, symbolize_names: true)
+    end
+    subject         { described_class.new }
 
-  subject do
-    described_class.new(
-      job_id, env, script_body, arguments, Etc.getlogin, '/tmp/foo', '/tmp/foo'
-    )
-  end
+    before do
+      allow(described_class).to receive(:run_lshw_xml).and_return(xml)
+    end
 
-  xit { should be_valid }
+    describe '#cpus' do
+      it { expect(subject.cpus).to eq(metadata[:cpus]) }
+    end
 
-  context 'with a nil job_id' do
-    let(:job_id) { nil }
-
-    xit { should_not be_valid }
+    describe '#gpus' do
+      it { expect(subject.gpus).to eq(metadata[:gpus]) }
+    end
   end
 
-  context 'with a file path as the job_id' do
-    let(:job_id) { '../../../../../../../root' }
+  context 'with a Standard_NC24s_v3 machine' do
+    let(:name) { 'Standard_NC24s_v3' }
 
-    xit { should_not be_valid }
-  end
-
-  context 'with a script as the env' do
-    let(:env) { '/usr/sbin/shutdown' }
-
-    xit { should_not be_valid }
-  end
-
-  context 'with a string as arrguments' do
-    let(:arguments) { 'adds-nice-handling-to-internal-errors' }
-
-    xit { should_not be_valid }
+    include_examples 'core profiler spec'
   end
 end
-

@@ -33,6 +33,7 @@ gem 'async-process'
 gem 'async-websocket'
 gem 'concurrent-ruby', require: 'concurrent'
 gem 'daemons'
+gem 'nokogiri'
 
 group :test do
   group :development do
