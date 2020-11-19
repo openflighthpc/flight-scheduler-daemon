@@ -26,18 +26,40 @@
 #==============================================================================
 
 require 'nokogiri'
+require 'open3'
 
 module FlightScheduler
   class Profiler
     MEM_TOTAL_REGEX = /^MemTotal:\s*(?<size>\d+)\s*kB$/
 
     def self.run_lshw_xml
-      # TODO: Run the lshw command here
-      ''
+      out, err, status = Open3.capture3('lshw', '-xml',
+                                        close_others: true,
+                                        unsetenv_others: true)
+      if status.success?
+        return out.chomp
+      else
+        Async.logger.debug <<~DEBUG
+          An error occurred when running lshw -xml:
+          STATUS: #{status.exitstatus}
+          STDOUT:
+          #{out}
+          STDERR:
+          #{err}
+        DEBUG
+        raise ProfilerError, <<~ERROR
+          Failed to determine the hardware information
+        ERROR
+      end
     end
 
     def self.read_meminfo
       File.read('/proc/meminfo')
+    rescue
+      Async.logger.debug($!.full_message)
+      raise ProfilerError, <<~ERROR.chomp
+        Failed to determine the memory information
+      ERROR
     end
 
     def cpus
