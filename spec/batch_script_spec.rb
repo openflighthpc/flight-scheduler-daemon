@@ -28,9 +28,10 @@
 require 'spec_helper'
 require 'securerandom'
 
-RSpec.describe FlightScheduler::BatchScriptRunner do
-  let(:job_id) { SecureRandom.uuid }
-  let(:env) { {} }
+RSpec.describe FlightScheduler::BatchScript do
+  let(:job) {
+    FlightScheduler::Job.new(SecureRandom.uuid, {}, Etc.getlogin)
+  }
   let(:script_body) do
     <<~SCRIPT
       #!/bin/bash
@@ -41,34 +42,34 @@ RSpec.describe FlightScheduler::BatchScriptRunner do
 
   subject do
     described_class.new(
-      job_id, env, script_body, arguments, Etc.getlogin, '/tmp/foo', '/tmp/foo'
+      job, script_body, arguments, '/tmp/foo', '/tmp/foo'
     )
   end
 
-  xit { should be_valid }
+  it { should be_valid }
 
-  context 'with a nil job_id' do
-    let(:job_id) { nil }
+  context 'with a nil job' do
+    let(:job) { nil }
 
-    xit { should_not be_valid }
+    it { should_not be_valid }
   end
 
   context 'with a file path as the job_id' do
-    let(:job_id) { '../../../../../../../root' }
+    let(:job) { '../../../../../../../root' }
 
-    xit { should_not be_valid }
+    it { should_not be_valid }
   end
 
-  context 'with a script as the env' do
-    let(:env) { '/usr/sbin/shutdown' }
+  context 'with a script as the job' do
+    let(:job) { '/usr/sbin/shutdown' }
 
-    xit { should_not be_valid }
+    it { should_not be_valid }
   end
 
   context 'with a string as arrguments' do
     let(:arguments) { 'adds-nice-handling-to-internal-errors' }
 
-    xit { should_not be_valid }
+    it { should_not be_valid }
   end
 end
 

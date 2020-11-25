@@ -46,7 +46,7 @@ module FlightScheduler
     # Checks the various parameters are in the correct format before running
     # This is to prevent rogue data being passed Process.spawn or rm -f
     def valid?
-      return false unless job
+      return false unless job.is_a?(Job)
       return false unless @script_body.is_a? String
       return false if @script_body.empty?
       return false unless @script_body[0..1] == '#!'
