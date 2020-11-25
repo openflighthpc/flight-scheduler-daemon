@@ -84,7 +84,7 @@ module FlightScheduler
           FileUtils.mkdir_p File.dirname(@script.stderr_path)
 
           # Build the options hash
-          opts = { unsetenv_others: true }
+          opts = { unsetenv_others: true, close_others: true }
           if @script.stdout_path == @script.stderr_path
             opts.merge!({ [:out, :err] => @script.stdout_path })
           else

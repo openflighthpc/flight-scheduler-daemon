@@ -34,12 +34,22 @@ module FlightScheduler
       @job = job
       @step = step
       @received_connection = false
+
+      # Generates the list of file descriptors inherited from the main daemon
+      @inherited_fds = ObjectSpace.each_object(IO).reject do |io|
+        # Do not include STDIN, STDOUT, STDERR
+        [0, 1, 2].include? io.fileno
+      rescue IOError
+        # Ignore File Descriptors which are already closed
+        true
+      end
     end
 
     def run
       run_step do |read, write, child_pid|
         io_thread = connect_std_streams(read, write, child_pid)
         notify_controller
+        close_inherited_fds
         wait_for_child(child_pid, sleep_on_exit: !@step.pty?)
         wait_for_connection
         io_thread.kill
@@ -60,6 +70,7 @@ module FlightScheduler
       opts = {
         chdir: @job.working_dir,
         unsetenv_others: true,
+        close_others: true
       }
       env = @job.env.merge({'TERM' => 'xterm-256color'})
       PTY.spawn(env, @step.path, *@step.arguments, **opts) do |read, write, pid|
@@ -78,6 +89,7 @@ module FlightScheduler
           in: input_rd,
           chdir: @job.working_dir,
           unsetenv_others: true,
+          close_others: true
         }
         Kernel.exec(@job.env, @step.path, *@step.arguments, **opts)
       end
@@ -208,6 +220,17 @@ module FlightScheduler
         port: @port,
         step_id: @step.id,
       })
+    end
+
+    # Closes the file descriptors inherited from the main daemon process
+    # This can not be done until after the notify_controller message has
+    # been sent
+    def close_inherited_fds
+      @inherited_fds.each do |io|
+        io.close
+      rescue IOError
+        # NOOP - Don't worry if the IO is already closed
+      end
     end
   end
 end
