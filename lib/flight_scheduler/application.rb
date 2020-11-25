@@ -81,6 +81,7 @@ module FlightScheduler
       Async do |task|
         controller_url = FlightScheduler.app.config.controller_url
         endpoint = Async::HTTP::Endpoint.parse(controller_url)
+        profiler.log
 
         loop do
           Async.logger.info("Connecting to #{controller_url.inspect}")

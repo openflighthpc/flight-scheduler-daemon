@@ -64,11 +64,20 @@ module FlightScheduler
       ERROR
     end
 
+    def log
+      Async.logger.info <<~PROFILE
+        Profiler Results:
+        cpus:   #{cpus}
+        gpus:   #{gpus}
+        memory: #{memory}
+      PROFILE
+    end
+
     # Currently assumes hyperthreading is the same as additional cores
     # This ensures consistency with the output form nproc
     # Consider revisiting
     def cpus
-      parser.xpath('//node[starts-with(@id, "cpu")]').reduce(0) do |sum, cpu|
+      @cpus ||= parser.xpath('//node[starts-with(@id, "cpu")]').reduce(0) do |sum, cpu|
         config = cpu.xpath('configuration/setting').each_with_object({}) do |config, memo|
           key, value = config.values
           memo[key] = value.to_i
@@ -87,7 +96,7 @@ module FlightScheduler
     end
 
     def gpus
-      parser.xpath('//node[starts-with(@id, "display")]').length
+      @gpus ||= parser.xpath('//node[starts-with(@id, "display")]').length
     end
 
     # NOTE: The memory info comes form /proc/meminfo as lshw is unreliable
