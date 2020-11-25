@@ -34,6 +34,9 @@ module FlightScheduler
 
     MEM_TOTAL_REGEX = /^MemTotal:\s*(?<size>\d+)\s*kB$/
 
+    # NOTE: The lshw command needs root permissions to function correctly. This
+    # shouldn't be a problem as the daemon already has these permissions to switch
+    # users. However it may cause issues if this was to change
     def self.run_lshw_xml
       out, err, status = Open3.capture3('lshw', '-xml',
                                         close_others: true,
