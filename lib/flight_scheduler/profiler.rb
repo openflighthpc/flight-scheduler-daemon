@@ -30,6 +30,8 @@ require 'open3'
 
 module FlightScheduler
   class Profiler
+    class ProfilerError < RuntimeError; end
+
     MEM_TOTAL_REGEX = /^MemTotal:\s*(?<size>\d+)\s*kB$/
 
     def self.run_lshw_xml

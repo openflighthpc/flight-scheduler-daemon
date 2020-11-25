@@ -28,5 +28,4 @@
 module FlightScheduler
   class BaseError < RuntimeError; end
   class JobValidationError < BaseError; end
-  class ProfilerError < RuntimeError; end
 end
