@@ -59,15 +59,7 @@ module FlightScheduler
         Async.logger.debug("Running script for job:#{job_id} script:#{script_body} arguments:#{arguments}")
         error_handler = lambda do
           Async.logger.warn("Error running script job:#{job_id} #{$!.message}")
-          if message[:array_job_id]
-            MessageSender.send(
-              command: 'NODE_FAILED_ARRAY_TASK',
-              array_job_id: message[:array_job_id],
-              array_task_id: message[:array_task_id],
-            )
-          else
-            MessageSender.send(command: 'NODE_FAILED_JOB', job_id: job_id)
-          end
+          MessageSender.send(command: 'NODE_FAILED_JOB', job_id: job_id)
         end
         begin
           job = FlightScheduler.app.job_registry.lookup_job(job_id)
@@ -80,19 +72,8 @@ module FlightScheduler
           Async do
             runner.wait
             Async.logger.info("Completed job #{job_id}")
-            if message[:array_job_id]
-              command = runner.success? ?
-                'NODE_COMPLETED_ARRAY_TASK' :
-                'NODE_FAILED_ARRAY_TASK'
-              MessageSender.send(
-                command: command,
-                array_job_id: message[:array_job_id],
-                array_task_id: message[:array_task_id],
-              )
-            else
-              command = runner.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
-              MessageSender.send(command: command, job_id: job_id)
-            end
+            command = runner.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
+            MessageSender.send(command: command, job_id: job_id)
           rescue
             error_handler.call
           end
