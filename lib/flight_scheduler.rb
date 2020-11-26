@@ -40,6 +40,7 @@ module FlightScheduler
   autoload(:JobStepRunner, 'flight_scheduler/job_step_runner')
   autoload(:MessageProcessor, 'flight_scheduler/message_processor')
   autoload(:MessageSender, 'flight_scheduler/message_sender')
+  autoload(:Profiler, 'flight_scheduler/profiler')
   autoload(:Stepd, 'flight_scheduler/stepd')
 
   VERSION = "0.0.1"

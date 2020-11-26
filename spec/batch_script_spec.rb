@@ -28,9 +28,10 @@
 require 'spec_helper'
 require 'securerandom'
 
-RSpec.describe FlightScheduler::BatchScriptRunner do
-  let(:job_id) { SecureRandom.uuid }
-  let(:env) { {} }
+RSpec.describe FlightScheduler::BatchScript do
+  let(:job) {
+    FlightScheduler::Job.new(SecureRandom.uuid, {}, Etc.getlogin)
+  }
   let(:script_body) do
     <<~SCRIPT
       #!/bin/bash
@@ -41,26 +42,26 @@ RSpec.describe FlightScheduler::BatchScriptRunner do
 
   subject do
     described_class.new(
-      job_id, env, script_body, arguments, Etc.getlogin, '/tmp/foo', '/tmp/foo'
+      job, script_body, arguments, '/tmp/foo', '/tmp/foo'
     )
   end
 
   it { should be_valid }
 
-  context 'with a nil job_id' do
-    let(:job_id) { nil }
+  context 'with a nil job' do
+    let(:job) { nil }
 
     it { should_not be_valid }
   end
 
   context 'with a file path as the job_id' do
-    let(:job_id) { '../../../../../../../root' }
+    let(:job) { '../../../../../../../root' }
 
     it { should_not be_valid }
   end
 
-  context 'with a script as the env' do
-    let(:env) { '/usr/sbin/shutdown' }
+  context 'with a script as the job' do
+    let(:job) { '/usr/sbin/shutdown' }
 
     it { should_not be_valid }
   end

@@ -1,0 +1,11 @@
+cpus: 64
+memory: 473392132096
+
+# The Azure documentation says there are four GPUs for this type of machine
+# However on inspection of lshw output, there are actually five:
+#  * four NVIDIA Corporation - GV100GL [Tesla V100 PCIe 16GB], and
+#  * one Microsoft Corporation - VGA compatible controller
+#
+# At the moment all five GPUs are consider equals, which in reality is not
+# the case. Consider revisiting at a future point
+gpus: 5

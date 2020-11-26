@@ -25,56 +25,48 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-require 'etc'
+require 'spec_helper'
+require 'yaml'
 
-module FlightScheduler
-  class Job
+RSpec.describe FlightScheduler::Profiler do
+  shared_examples 'core profiler spec' do
+    let(:xml)       { file_fixture("profiler/#{name}.xml").read }
+    let(:meminfo)   { file_fixture("profiler/#{name}.meminfo").read }
+    let(:metadata)  do
+      # The metadata is used to configure the spec to the instance,
+      # it is not part of the Profiler itself
+      YAML.load(file_fixture("profiler/#{name}.metadata.yaml").read, symbolize_names: true)
+    end
+    subject         { described_class.new }
 
-    attr_reader :id, :username
-
-    def initialize(id, env, username)
-      @id = id
-      @env = env
-      @username = username
+    before do
+      allow(described_class).to receive(:run_lshw_xml).and_return(xml)
+      allow(described_class).to receive(:read_meminfo).and_return(meminfo)
     end
 
-    # Checks the various parameters are in the correct format before running
-    # This is to prevent rogue data being passed Process.spawn or rm -f
-    def valid?
-      return false unless id.is_a?(String)
-      return false unless /\A[\w-]+\Z/.match? id
-      return false unless @env.is_a? Hash
-      return false unless passwd
-      true
+    describe '#cpus' do
+      it { expect(subject.cpus).to eq(metadata[:cpus]) }
     end
 
-    def env
-      stringified = @env.map { |k, v| [k.to_s, v] }.to_h
-      stringified.merge(
-        'HOME' => home_dir,
-        'LOGNAME' => username,
-        'PATH' => '/bin:/sbin:/usr/bin:/usr/sbin',
-        'USER' => username,
-        'flight_ROOT' => ENV['flight_ROOT'],
-      )
+    describe '#gpus' do
+      it { expect(subject.gpus).to eq(metadata[:gpus]) }
     end
 
-    def home_dir
-      passwd.dir
+    describe '#memory' do
+      it { expect(subject.memory).to eq(metadata[:memory]) }
     end
+  end
 
-    def working_dir
-      home_dir
-    end
+  context 'with a Standard_NC24s_v3 machine' do
+    let(:name) { 'Standard_NC24s_v3' }
 
-    def gid
-      passwd.gid
-    end
+    include_examples 'core profiler spec'
+  end
 
-    def passwd
-      @passwd ||= Etc.getpwnam(username)
-    rescue ArgumentError
-      # NOOP - The user can not be found, this is handled in valid?
-    end
+  # Tests multi-core cpus with hyper-threading
+  context 'with a dell-xps13 machine' do
+    let(:name) { 'dell-xps13' }
+
+    include_examples 'core profiler spec'
   end
 end

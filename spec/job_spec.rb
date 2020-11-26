@@ -25,56 +25,35 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
-require 'etc'
+require 'spec_helper'
+require 'securerandom'
 
-module FlightScheduler
-  class Job
+RSpec.describe FlightScheduler::Job do
+  let(:id) { SecureRandom.uuid }
+  let(:env) { {} }
+  let(:username) { Etc.getlogin }
 
-    attr_reader :id, :username
+  subject do
+    described_class.new(id, env, username)
+  end
 
-    def initialize(id, env, username)
-      @id = id
-      @env = env
-      @username = username
-    end
+  it { should be_valid }
 
-    # Checks the various parameters are in the correct format before running
-    # This is to prevent rogue data being passed Process.spawn or rm -f
-    def valid?
-      return false unless id.is_a?(String)
-      return false unless /\A[\w-]+\Z/.match? id
-      return false unless @env.is_a? Hash
-      return false unless passwd
-      true
-    end
+  context 'with a nil id' do
+    let(:id) { nil }
 
-    def env
-      stringified = @env.map { |k, v| [k.to_s, v] }.to_h
-      stringified.merge(
-        'HOME' => home_dir,
-        'LOGNAME' => username,
-        'PATH' => '/bin:/sbin:/usr/bin:/usr/sbin',
-        'USER' => username,
-        'flight_ROOT' => ENV['flight_ROOT'],
-      )
-    end
+    it { should_not be_valid }
+  end
 
-    def home_dir
-      passwd.dir
-    end
+  context 'with a hash the job_id' do
+    let(:id) { {} }
 
-    def working_dir
-      home_dir
-    end
+    it { should_not be_valid }
+  end
 
-    def gid
-      passwd.gid
-    end
+  context 'with a username as the env' do
+    let(:env) { 'username' }
 
-    def passwd
-      @passwd ||= Etc.getpwnam(username)
-    rescue ArgumentError
-      # NOOP - The user can not be found, this is handled in valid?
-    end
+    it { should_not be_valid }
   end
 end

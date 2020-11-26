@@ -56,11 +56,32 @@ module FlightScheduler
       end
     end
 
+    def profiler
+      @profiler ||= Profiler.new
+    end
+
+    def auth_token
+      @auth_token ||= FlightScheduler::Auth.token
+    end
+
+    # NOTE: This method can not use the MessageSender as it could block
+    #       the main task from re-establishing the connection.
+    def send_connected(con)
+      con.write({
+        command: 'CONNECTED',
+        auth_token: auth_token,
+        cpus: profiler.cpus,
+        gpus: profiler.gpus,
+        memory: profiler.memory
+      })
+      con.flush
+    end
+
     def run
       Async do |task|
         controller_url = FlightScheduler.app.config.controller_url
         endpoint = Async::HTTP::Endpoint.parse(controller_url)
-        auth_token = FlightScheduler::Auth.token
+        profiler.log
 
         loop do
           Async.logger.info("Connecting to #{controller_url.inspect}")
@@ -68,9 +89,8 @@ module FlightScheduler
             Async.logger.info("Connected to #{controller_url.inspect}")
             @connection = connection
             processor = MessageProcessor.new
-            connection.write({command: "CONNECTED", auth_token: auth_token})
-            connection.flush
-            while message = connection.read
+            send_connected(@connection)
+            while message = @connection.read
               processor.call(message)
             end
             connection.close

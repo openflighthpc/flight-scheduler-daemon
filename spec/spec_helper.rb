@@ -32,6 +32,9 @@ Bundler.require(:development, :test)
 
 require_relative '../config/boot.rb'
 
+require 'active_support/core_ext/class/attribute'
+require 'active_support/testing/file_fixtures'
+
 RSpec.configure do |config|
   # rspec-expectations config goes here. You can use an alternate
   # assertion/expectation library such as wrong or the stdlib/minitest
@@ -107,4 +110,12 @@ RSpec.configure do |config|
   # test failures related to randomization by passing the same `--seed` value
   # as the one that triggered the failure.
   Kernel.srand config.seed
+
+  # Enable the FileFixtures methods from ActiveSupport
+  # NOTE: It needs to be manually configured as it has been taken out of
+  # context from Rails
+  include ActiveSupport::Testing::FileFixtures
+  def file_fixture_path
+    File.expand_path('fixtures', __dir__)
+  end
 end
