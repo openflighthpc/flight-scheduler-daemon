@@ -81,11 +81,11 @@ module FlightScheduler
 
       when 'RUN_STEP'
         arguments = message[:arguments]
+        env       = message[:environment]
         job_id    = message[:job_id]
         path      = message[:path]
         pty       = message[:pty]
         step_id   = message[:step_id]
-        envs      = message[:envs]
 
         Async.logger.debug("Running step:#{step_id} for job:#{job_id} path:#{path} arguments:#{arguments}")
         error_handler = lambda do
@@ -94,7 +94,7 @@ module FlightScheduler
         end
         begin
           job = FlightScheduler.app.job_registry.lookup_job!(job_id)
-          step = JobStep.new(job, step_id, path, arguments, pty, envs)
+          step = JobStep.new(job, step_id, path, arguments, pty, env)
           runner = JobStepRunner.new(step)
           runner.run
         rescue
