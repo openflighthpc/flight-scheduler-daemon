@@ -58,6 +58,10 @@ module FlightScheduler
 
     private
 
+    def env
+      @job.env.merge(@step.env)
+    end
+
     def run_step(&block)
       if @step.pty?
         run_step_pty(&block)
@@ -72,7 +76,6 @@ module FlightScheduler
         unsetenv_others: true,
         close_others: true
       }
-      env = @job.env.merge({'TERM' => 'xterm-256color'})
       PTY.spawn(env, @step.path, *@step.arguments, **opts) do |read, write, pid|
         yield read, write, pid
       end
@@ -91,7 +94,7 @@ module FlightScheduler
           unsetenv_others: true,
           close_others: true
         }
-        Kernel.exec(@job.env, @step.path, *@step.arguments, **opts)
+        Kernel.exec(env, @step.path, *@step.arguments, **opts)
       end
       input_rd.close
       output_wr.close

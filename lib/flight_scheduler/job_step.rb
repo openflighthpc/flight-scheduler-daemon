@@ -29,12 +29,13 @@ module FlightScheduler
   class JobStep
     attr_reader :job, :id, :path, :arguments
 
-    def initialize(job, id, path, arguments, pty)
+    def initialize(job, id, path, arguments, pty, env)
       @job = job
       @id = id
       @path = path
       @arguments = arguments
       @pty = pty
+      @env = env
     end
 
     # Checks the various parameters are in the correct format before running
@@ -43,11 +44,16 @@ module FlightScheduler
       return false unless job
       return false unless path.is_a? String
       return false unless arguments.is_a? Array
+      return false unless env.is_a? Hash
       true
     end
 
     def pty?
       !!@pty
+    end
+
+    def env
+      @env.map { |k, v| [k.to_s, v.to_s] }.to_h
     end
   end
 end
