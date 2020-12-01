@@ -60,6 +60,9 @@ module FlightScheduler
       Async do |task|
         # Fork to create the child process [Non Blocking]
         @child_pid = Kernel.fork do
+          # Ignore SIGTERM in the parent. It has been sent to the children.
+          trap('SIGTERM') {}
+
           # Become the requested user and session leader
           Process::Sys.setgid(@job.gid)
           Process::Sys.setuid(@job.username)
@@ -85,7 +88,7 @@ module FlightScheduler
     # Kills the associated subprocess
     def cancel
       return unless @child_pid
-      Process.kill('SIGTERM', @child_pid)
+      Process.kill('-SIGTERM', @child_pid)
     rescue Errno::ESRCH
       # NOOP - Don't worry if the process has already finished
     end

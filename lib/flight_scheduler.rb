@@ -35,6 +35,7 @@ module FlightScheduler
   autoload(:Auth, 'flight_scheduler/auth')
   autoload(:BatchScript, 'flight_scheduler/batch_script')
   autoload(:BatchScriptRunner, 'flight_scheduler/batch_script_runner')
+  autoload(:Batchd, 'flight_scheduler/batchd')
   autoload(:Configuration, 'flight_scheduler/configuration')
   autoload(:Job, 'flight_scheduler/job')
   autoload(:JobRegistry, 'flight_scheduler/job_registry')

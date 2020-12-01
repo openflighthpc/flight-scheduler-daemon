@@ -66,26 +66,13 @@ module FlightScheduler
         stdout      = message[:stdout_path]
 
         Async.logger.debug("Running script for job:#{job_id} script:#{script_body} arguments:#{arguments}")
-        error_handler = lambda do
-          Async.logger.warn("Error running script job:#{job_id} #{$!.message}")
-          MessageSender.send(command: 'NODE_FAILED_JOB', job_id: job_id)
-        end
         begin
           job = FlightScheduler.app.job_registry.lookup_job(job_id)
           script = BatchScript.new(job, script_body, arguments, stdout, stderr)
-          runner = FlightScheduler::BatchScriptRunner.new(script)
-          runner.run
+          FlightScheduler::BatchScriptRunner.new(script).run
         rescue
-          error_handler.call
-        else
-          Async do
-            runner.wait
-            Async.logger.info("Completed job #{job_id}")
-            command = runner.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
-            MessageSender.send(command: command, job_id: job_id)
-          rescue
-            error_handler.call
-          end
+          Async.logger.warn("Error running script job:#{job_id} #{$!.message}")
+          MessageSender.send(command: 'NODE_FAILED_JOB', job_id: job_id)
         end
 
       when 'RUN_STEP'

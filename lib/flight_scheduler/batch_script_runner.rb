@@ -39,16 +39,6 @@ module FlightScheduler
       @job = @script.job
     end
 
-    def wait
-      @task.wait
-    end
-
-    # Checks if the child process has exited correctly
-    def success?
-      return nil unless @status
-      @status.success?
-    end
-
     # Run the given batch script in a subprocess and return an Async::Task.
     #
     # Invariants:
@@ -68,9 +58,12 @@ module FlightScheduler
       end
 
       FlightScheduler.app.job_registry.add_runner(@job.id, 'BATCH', self)
-      @task = Async do |task|
+      Async do |task|
         # Fork to create the child process [Non Blocking]
         @child_pid = Kernel.fork do
+          # Ignore SIGTERM in the parent. It has been sent to the children.
+          trap('SIGTERM') {}
+
           # Write the script_body to disk before we switch user.  We can't
           # assume that the new user can write to this directory.
           @script.write
@@ -80,30 +73,17 @@ module FlightScheduler
           Process::Sys.setuid(@job.username)
           Process.setsid
 
-          FileUtils.mkdir_p File.dirname(@script.stdout_path)
-          FileUtils.mkdir_p File.dirname(@script.stderr_path)
-
-          # Build the options hash
-          opts = { unsetenv_others: true, close_others: true }
-          if @script.stdout_path == @script.stderr_path
-            opts.merge!({ [:out, :err] => @script.stdout_path })
-          else
-            opts.merge!(out: @script.stdout_path, err: @script.stderr_path)
-          end
-
-          Dir.chdir(@job.working_dir)
-          # Exec into the job command
-          Kernel.exec(@job.env, @script.path, *@script.arguments, **opts)
+          batchd = Batchd.new(@job, @script)
+          batchd.run
         rescue
           Async.logger.warn("Error forking script runner") { $! }
           raise
         end
 
         # Loop asynchronously until the child is finished
-        until out = Process.wait2(@child_pid, Process::WNOHANG) do
+        until Process.wait2(@child_pid, Process::WNOHANG) do
           task.sleep 1
         end
-        @status = out.last
 
         # Reset the child_pid, this prevents cancel killing other processes
         # which might spawn with the same PID
@@ -117,7 +97,7 @@ module FlightScheduler
     # Kills the associated subprocess
     def cancel
       return unless @child_pid
-      Process.kill('SIGTERM', @child_pid)
+      Process.kill('-SIGTERM', @child_pid)
     rescue Errno::ESRCH
       # NOOP - Don't worry if the process has already finished
     end
