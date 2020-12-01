@@ -39,8 +39,7 @@ module FlightScheduler
     end
 
     def path
-      spool_dir = FlightScheduler.app.config.spool_dir
-      spool_dir.join('state', job.id, 'job-script').to_path
+      job.dirname.join('job-script').to_path
     end
 
     # Checks the various parameters are in the correct format before running
@@ -65,14 +64,17 @@ module FlightScheduler
     end
 
     def write
-      # Write the script_body to disk
-      FileUtils.mkdir_p(File.dirname(path))
-      File.write(path, @script_body)
-      FileUtils.chmod(0755, path)
+      Sync do
+        FileUtils.mkdir_p(File.dirname(path))
+        File.write(path, @script_body)
+        FileUtils.chmod(0755, path)
+      end
     end
 
     def remove
-      FileUtils.rm_rf(File.dirname(path))
+      Sync do
+        FileUtils.rm_rf(File.dirname(path))
+      end
     end
   end
 end

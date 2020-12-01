@@ -26,6 +26,8 @@
 #==============================================================================
 
 require "active_support/string_inquirer"
+require "active_support/core_ext/object/blank"
+
 require 'flight_scheduler/errors'
 
 module FlightScheduler
@@ -40,6 +42,7 @@ module FlightScheduler
   autoload(:JobStepRunner, 'flight_scheduler/job_step_runner')
   autoload(:MessageProcessor, 'flight_scheduler/message_processor')
   autoload(:MessageSender, 'flight_scheduler/message_sender')
+  autoload(:Persistence, 'flight_scheduler/persistence')
   autoload(:Profiler, 'flight_scheduler/profiler')
   autoload(:Stepd, 'flight_scheduler/stepd')
 

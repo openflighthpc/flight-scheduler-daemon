@@ -60,7 +60,7 @@ module FlightScheduler
     #   task has completed, the subprocess has completed and is no longer in
     #   the job registry.
     def run
-      unless @job.valid? && @script.valid?
+      unless @script.valid?
         raise JobValidationError, <<~ERROR.chomp
           An unexpected error has occurred! The batch script does not appear
           to be in a valid state.
@@ -94,6 +94,9 @@ module FlightScheduler
           Dir.chdir(@job.working_dir)
           # Exec into the job command
           Kernel.exec(@job.env, @script.path, *@script.arguments, **opts)
+        rescue
+          Async.logger.warn("Error forking script runner") { $! }
+          raise
         end
 
         # Loop asynchronously until the child is finished

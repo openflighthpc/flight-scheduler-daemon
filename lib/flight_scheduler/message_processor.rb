@@ -43,9 +43,18 @@ module FlightScheduler
         Async.logger.debug("Environment: #{env.map { |k, v| "#{k}=#{v}" }.join("\n")}")
         begin
           job = FlightScheduler::Job.new(job_id, env, username)
-          FlightScheduler.app.job_registry.add_job(job.id, job)
+          if job.valid?
+            job.write
+            FlightScheduler.app.job_registry.add_job(job.id, job)
+            FlightScheduler.app.job_registry.save
+          else
+            raise JobValidationError, <<~ERROR.chomp
+              An unexpected error has occurred! The job does not appear to be
+              in a valid state.
+            ERROR
+          end
         rescue
-          Async.logger.warn("Error configuring job #{job_id} #{$!.message}")
+          Async.logger.warn("Error configuring job #{job_id}") { $! }
           MessageSender.send(command: 'JOB_ALLOCATION_FAILED', job_id: job_id)
         end
 
@@ -130,6 +139,7 @@ module FlightScheduler
           # Wait for the runners to finish and remove the job
           task.sleep(0.1) until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
           FlightScheduler.app.job_registry.remove_job(job_id)
+          FlightScheduler.app.job_registry.save
           MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
         end
 
@@ -153,6 +163,7 @@ module FlightScheduler
 
           task.sleep(0.1) until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
           FlightScheduler.app.job_registry.remove_job(job_id)
+          FlightScheduler.app.job_registry.save
           MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
         end
 
