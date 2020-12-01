@@ -32,25 +32,10 @@ module FlightScheduler
   #
   # Run the given job step and save a reference to it in the job registry.
   #
-  # Current limitations:
-  #
-  # * The job's standard input and output are not redirected to the `run`
-  #   client.
-  #
   class JobStepRunner
     def initialize(step)
       @step = step
       @job = @step.job
-    end
-
-    def wait
-      @task.wait
-    end
-
-    # Checks if the child process has exited correctly
-    def success?
-      return nil unless @status
-      @status.success?
     end
 
     # Run the given step in a subprocess and return an Async::Task.
@@ -72,7 +57,7 @@ module FlightScheduler
       end
 
       FlightScheduler.app.job_registry.add_runner(@job.id, @step.id, self)
-      @task = Async do |task|
+      Async do |task|
         # Fork to create the child process [Non Blocking]
         @child_pid = Kernel.fork do
           # Become the requested user and session leader
@@ -85,10 +70,9 @@ module FlightScheduler
         end
 
         # Loop asynchronously until the child is finished
-        until out = Process.wait2(@child_pid, Process::WNOHANG) do
+        until Process.wait2(@child_pid, Process::WNOHANG) do
           task.sleep 1
         end
-        @status = out.last
 
         # Reset the child_pid, this prevents cancel killing other processes
         # which might spawn with the same PID
