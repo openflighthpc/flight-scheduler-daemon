@@ -33,14 +33,18 @@ module FlightScheduler
     attr_reader :id, :username
 
     def self.from_serialized_hash(hash)
-      id, username = hash.stringify_keys.slice(*%w(id username)).values
-      new(id, nil, username)
+      id, username, time_out, created_time = hash.stringify_keys
+                                                 .slice(*%w(id username time_out created_time))
+                                                 .values
+      new(id, nil, username, time_out, created_time: created_time)
     end
 
-    def initialize(id, env, username)
+    def initialize(id, env, username, time_out, created_time: nil)
       @id = id
       @env = env
       @username = username
+      @time_out = time_out
+      @created_time = created_time || Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i
     end
 
     # Checks the various parameters are in the correct format before running
@@ -50,6 +54,7 @@ module FlightScheduler
       return false unless /\A[\w-]+\Z/.match? id
       return false unless env.is_a? Hash
       return false unless passwd
+      return false unless @time_out.nil? || (@time_out.is_a?(Integer) || @time_out >= 0)
       true
     end
 
@@ -82,7 +87,7 @@ module FlightScheduler
     end
 
     def serializable_hash
-      { id: id, username: username }
+      { id: id, username: username, time_out: @time_out, created_time: @created_time }
     end
 
     def passwd
@@ -109,6 +114,38 @@ module FlightScheduler
     def remove
       Sync do
         FileUtils.rm_rf(dirname)
+      end
+    end
+
+    def time_out?
+      return false if [nil, 0].include?(@time_out)
+      Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i > @created_time + @time_out
+    end
+
+    # Must be called after adding to the registry
+    def start_time_out_task
+      return if [nil, 0].include? @time_out
+      Async do |task|
+        Async.logger.info "Job '#{id}' will start timing out in '#{@time_out}'"
+        while FlightScheduler.app.job_registry.lookup_job(id)
+          if time_out?
+            if @timed_out_time
+              # NOOP
+            else
+              Async.logger.error "Job Timed Out: #{id}"
+              @timed_out_time ||= Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i
+              send_signal("TERM")
+            end
+          end
+          task.sleep 5
+        end
+      end
+    end
+
+    def send_signal(sig)
+      Async.logger.warn "Sending #{sig} to job: #{id}"
+      FlightScheduler.app.job_registry.lookup_runners(id).each do |runner|
+        runner.send_signal(sig)
       end
     end
 

@@ -112,12 +112,17 @@ module FlightScheduler
       end
     end
 
-    # Kills the associated subprocess
-    def cancel
+    def send_signal(sig)
       return unless @child_pid
-      Process.kill('-SIGTERM', @child_pid)
+      Async.logger.debug "Sending #{sig} to Process Group #{@child_pid}"
+      Process.kill(-Signal.list[sig], @child_pid)
     rescue Errno::ESRCH
       # NOOP - Don't worry if the process has already finished
+    end
+
+    # Kills the associated subprocess
+    def cancel
+      send_signal('TERM')
     end
   end
 end

@@ -41,6 +41,7 @@ module FlightScheduler
     class DuplicateRunner < RuntimeError; end
     class UnknownJob < RuntimeError; end
     class DeallocatedJob < RuntimeError; end
+    class TimedOutJob < RuntimeError; end
 
     def initialize
       @jobs = Concurrent::Hash.new
@@ -56,6 +57,7 @@ module FlightScheduler
     def add_runner(job_id, runner_id, runner)
       data = @jobs[job_id]
       raise UnknownJob, job_id if data.nil?
+      raise TimedOutJob, job_id if data[:job].time_out?
       raise DeallocatedJob, job_id if data[:deallocated]
       runners = data[:runners]
       if runners[runner_id]
