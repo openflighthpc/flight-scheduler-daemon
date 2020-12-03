@@ -128,13 +128,25 @@ module FlightScheduler
       Async do |task|
         Async.logger.info "Job '#{id}' will start timing out in '#{@time_out}'"
         while FlightScheduler.app.job_registry.lookup_job(id)
-          if time_out?
-            if @timed_out_time
-              # NOOP
-            else
+          if @timed_out_time || time_out?
+            first = @timed_out_time ? false : true
+            @timed_out_time ||= Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i
+
+            if first
               Async.logger.error "Job Timed Out: #{id}"
               @timed_out_time ||= Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i
               send_signal("TERM")
+              task.yield
+            elsif (Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i - @timed_out_time) > 90
+              send_signal("SIGKILL")
+              task.yield
+            end
+
+            if FlightScheduler.app.job_registry.lookup_runners(id).empty?
+              Async.logger.info "Deallocating timed out job: #{id}"
+              FlightScheduler.app.job_registry.remove_job(id)
+              FlightScheduler.app.job_registry.save
+              MessageSender.send(command: 'NODE_DEALLOCATED', job_id: id)
             end
           end
           task.sleep 5
@@ -144,7 +156,10 @@ module FlightScheduler
 
     def send_signal(sig)
       Async.logger.warn "Sending #{sig} to job: #{id}"
-      FlightScheduler.app.job_registry.lookup_runners(id).each do |runner|
+      # TODO: Remove the to_h.values when lookup_runners either:
+      #  1. Returns a hash
+      #  2. Returns only the values of said hash
+      FlightScheduler.app.job_registry.lookup_runners(id).to_h.values.each do |runner|
         runner.send_signal(sig)
       end
     end
