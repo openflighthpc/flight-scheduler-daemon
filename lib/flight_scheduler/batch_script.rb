@@ -59,7 +59,7 @@ module FlightScheduler
       File.expand_path(@stdout_path, job.home_dir)
     end
 
-    def stderr_path 
+    def stderr_path
       File.expand_path(@stderr_path, job.home_dir)
     end
 

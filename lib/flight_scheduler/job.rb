@@ -134,12 +134,14 @@ module FlightScheduler
 
             if first
               Async.logger.error "Job Timed Out: #{id}"
-              @timed_out_time ||= Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i
+              MessageSender.send(command: 'JOB_TIMED_OUT', job_id: id)
               send_signal("TERM")
+              # Allow fast exiting runners to finalise quickly
               task.yield
             elsif (Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i - @timed_out_time) > 90
-              send_signal("SIGKILL")
-              task.yield
+              send_signal("KILL")
+              # Ensure slow exiting runners have finished
+              task.sleep 5
             end
 
             if FlightScheduler.app.job_registry.lookup_runners(id).empty?
@@ -156,10 +158,7 @@ module FlightScheduler
 
     def send_signal(sig)
       Async.logger.warn "Sending #{sig} to job: #{id}"
-      # TODO: Remove the to_h.values when lookup_runners either:
-      #  1. Returns a hash
-      #  2. Returns only the values of said hash
-      FlightScheduler.app.job_registry.lookup_runners(id).to_h.values.each do |runner|
+      FlightScheduler.app.job_registry.lookup_runners(id).each do |_, runner|
         runner.send_signal(sig)
       end
     end
