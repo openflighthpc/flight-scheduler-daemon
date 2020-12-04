@@ -70,11 +70,5 @@ module FlightScheduler
         FileUtils.chmod(0755, path)
       end
     end
-
-    def remove
-      Sync do
-        FileUtils.rm_rf(File.dirname(path))
-      end
-    end
   end
 end
