@@ -65,6 +65,7 @@ module FlightScheduler
     end
 
     def remove_job(job_id)
+      lookup_job(job_id)&.remove
       @jobs.delete(job_id)
     end
 
@@ -97,6 +98,33 @@ module FlightScheduler
     def lookup_runner(job_id, runner_id)
       data = @jobs[job_id]
       data.nil? ? nil : data[:runners][runner_id]
+    end
+
+    def load
+      data = persistence.load
+      return if data.nil?
+      data.each do |hash|
+        job = Job.from_serialized_hash(hash)
+        if job.valid?
+          add_job(job.id, job)
+        else
+          Async.logger.warn("Invalid job loaded: #{job.inspect}")
+        end
+      end
+    rescue
+      Async.logger.warn("Error loading job registry") { $! }
+      raise
+    end
+
+    def save
+      serialized_jobs = @jobs.values.map { |h| h[:job].serializable_hash }
+      persistence.save(serialized_jobs)
+    end
+
+    private
+
+    def persistence
+      @persistence ||= FlightScheduler::Persistence.new('job registry', 'job_state')
     end
   end
 end

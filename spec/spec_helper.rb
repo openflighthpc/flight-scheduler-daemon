@@ -30,6 +30,7 @@
 require 'bundler'
 Bundler.require(:development, :test)
 
+ENV['RACK_ENV'] ||= 'test'
 require_relative '../config/boot.rb'
 
 require 'active_support/core_ext/class/attribute'

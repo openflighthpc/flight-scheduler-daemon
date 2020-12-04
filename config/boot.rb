@@ -30,3 +30,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 require 'flight_scheduler'
 FlightScheduler.app.load_configuration
+
+unless FlightScheduler.env.test?
+  FlightScheduler.app.job_registry.load
+end

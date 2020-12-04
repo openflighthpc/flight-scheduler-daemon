@@ -43,9 +43,18 @@ module FlightScheduler
         Async.logger.debug("Environment: #{env.map { |k, v| "#{k}=#{v}" }.join("\n")}")
         begin
           job = FlightScheduler::Job.new(job_id, env, username)
-          FlightScheduler.app.job_registry.add_job(job.id, job)
+          if job.valid?
+            job.write
+            FlightScheduler.app.job_registry.add_job(job.id, job)
+            FlightScheduler.app.job_registry.save
+          else
+            raise JobValidationError, <<~ERROR.chomp
+              An unexpected error has occurred! The job does not appear to be
+              in a valid state.
+            ERROR
+          end
         rescue
-          Async.logger.warn("Error configuring job #{job_id} #{$!.message}")
+          Async.logger.warn("Error configuring job #{job_id}") { $! }
           MessageSender.send(command: 'JOB_ALLOCATION_FAILED', job_id: job_id)
         end
 
@@ -57,26 +66,13 @@ module FlightScheduler
         stdout      = message[:stdout_path]
 
         Async.logger.debug("Running script for job:#{job_id} script:#{script_body} arguments:#{arguments}")
-        error_handler = lambda do
-          Async.logger.warn("Error running script job:#{job_id} #{$!.message}")
-          MessageSender.send(command: 'NODE_FAILED_JOB', job_id: job_id)
-        end
         begin
           job = FlightScheduler.app.job_registry.lookup_job(job_id)
           script = BatchScript.new(job, script_body, arguments, stdout, stderr)
-          runner = FlightScheduler::BatchScriptRunner.new(script)
-          runner.run
+          FlightScheduler::BatchScriptRunner.new(script).run
         rescue
-          error_handler.call
-        else
-          Async do
-            runner.wait
-            Async.logger.info("Completed job #{job_id}")
-            command = runner.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
-            MessageSender.send(command: command, job_id: job_id)
-          rescue
-            error_handler.call
-          end
+          Async.logger.warn("Error running script job:#{job_id} #{$!.message}")
+          MessageSender.send(command: 'NODE_FAILED_JOB', job_id: job_id)
         end
 
       when 'RUN_STEP'
@@ -88,26 +84,13 @@ module FlightScheduler
         step_id   = message[:step_id]
 
         Async.logger.debug("Running step:#{step_id} for job:#{job_id} path:#{path} arguments:#{arguments}")
-        error_handler = lambda do
-          Async.logger.warn("Error running step:#{step_id} for job:#{job_id} #{$!.message}")
-          MessageSender.send(command: 'RUN_STEP_FAILED', job_id: job_id, step_id: step_id)
-        end
         begin
           job = FlightScheduler.app.job_registry.lookup_job!(job_id)
           step = JobStep.new(job, step_id, path, arguments, pty, env)
-          runner = JobStepRunner.new(step)
-          runner.run
+          JobStepRunner.new(step).run
         rescue
-          error_handler.call
-        else
-          Async do
-            runner.wait
-            Async.logger.info("Completed step:#{step_id} for job #{job_id}")
-            command = runner.success? ? 'RUN_STEP_COMPLETED' : 'RUN_STEP_FAILED'
-            MessageSender.send(command: command, job_id: job_id, step_id: step_id)
-          rescue
-            error_handler.call
-          end
+          Async.logger.warn("Error running step:#{step_id} for job:#{job_id} #{$!.message}")
+          MessageSender.send(command: 'RUN_STEP_FAILED', job_id: job_id, step_id: step_id)
         end
 
       when 'JOB_CANCELLED'
@@ -130,6 +113,7 @@ module FlightScheduler
           # Wait for the runners to finish and remove the job
           task.sleep(0.1) until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
           FlightScheduler.app.job_registry.remove_job(job_id)
+          FlightScheduler.app.job_registry.save
           MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
         end
 
@@ -153,6 +137,7 @@ module FlightScheduler
 
           task.sleep(0.1) until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
           FlightScheduler.app.job_registry.remove_job(job_id)
+          FlightScheduler.app.job_registry.save
           MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
         end
 

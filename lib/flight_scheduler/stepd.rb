@@ -34,25 +34,23 @@ module FlightScheduler
       @job = job
       @step = step
       @received_connection = false
-
-      # Generates the list of file descriptors inherited from the main daemon
-      @inherited_fds = ObjectSpace.each_object(IO).reject do |io|
-        # Do not include STDIN, STDOUT, STDERR
-        [0, 1, 2].include? io.fileno
-      rescue IOError
-        # Ignore File Descriptors which are already closed
-        true
-      end
     end
 
     def run
-      run_step do |read, write, child_pid|
-        io_thread = connect_std_streams(read, write, child_pid)
-        notify_controller
-        close_inherited_fds
-        wait_for_child(child_pid, sleep_on_exit: !@step.pty?)
-        wait_for_connection
-        io_thread.kill
+      Async do
+        with_controller_connection do |connection|
+          run_step do |read, write, child_pid|
+            io_thread = connect_std_streams(read, write, child_pid)
+            notify_started(connection)
+            status = wait_for_child(child_pid, sleep_on_exit: !@step.pty?)
+            wait_for_client_connection
+            io_thread.kill
+            notify_finished(status, connection)
+          end
+        end
+      rescue
+        Async.logger.warn { $! }
+        raise
       end
     end
 
@@ -104,7 +102,7 @@ module FlightScheduler
 
     def wait_for_child(child_pid, sleep_on_exit:)
       Async.logger.info("stepd: waiting on child_pid:#{child_pid}")
-      Process.wait(child_pid)
+      _, status = Process.wait2(child_pid)
       Async.logger.debug("stepd: done waiting on child_pid:#{child_pid}")
 
       if sleep_on_exit
@@ -112,9 +110,10 @@ module FlightScheduler
         # network reliably.
         sleep 0.1
       end
+      status
     end
 
-    def wait_for_connection
+    def wait_for_client_connection
       # If we haven't yet received a connection, it may be because we're
       # running a very quick command, which doesn't produce enough output to
       # block on a full output pipe.  Examples are `hostname` or `date`.
@@ -216,23 +215,38 @@ module FlightScheduler
       end
     end
 
-    def notify_controller
-      MessageSender.send({
+    def notify_started(connection)
+      connection.write({
         command: 'RUN_STEP_STARTED',
         job_id: @job.id,
         port: @port,
         step_id: @step.id,
       })
+      connection.flush
     end
 
-    # Closes the file descriptors inherited from the main daemon process
-    # This can not be done until after the notify_controller message has
-    # been sent
-    def close_inherited_fds
-      @inherited_fds.each do |io|
-        io.close
-      rescue IOError
-        # NOOP - Don't worry if the IO is already closed
+    def notify_finished(status, connection)
+      command = status.success? ? 'RUN_STEP_COMPLETED' : 'RUN_STEP_FAILED'
+      connection.write(command: command, job_id: @job.id, step_id: @step.id)
+      connection.flush
+    end
+
+    def with_controller_connection(&block)
+      controller_url = FlightScheduler.app.config.controller_url
+      endpoint = Async::HTTP::Endpoint.parse(controller_url)
+      auth_token = FlightScheduler::Auth.token
+
+      Async.logger.info("Connecting to #{controller_url.inspect}") { endpoint }
+      Async::WebSocket::Client.connect(endpoint) do |connection|
+        Async.logger.info("Connected to #{controller_url.inspect}")
+        @connection = connection
+        connection.write({
+          command: 'STEPD_CONNECTED',
+          auth_token: auth_token,
+          name: "#{@job.id}.#{@step.id}",
+        })
+        connection.flush
+        block.call(connection)
       end
     end
   end
