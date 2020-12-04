@@ -48,7 +48,6 @@ module FlightScheduler
             job.write
             FlightScheduler.app.job_registry.add_job(job.id, job)
             FlightScheduler.app.job_registry.save
-            job.start_time_out_task
 
           else
             raise JobValidationError, <<~ERROR.chomp

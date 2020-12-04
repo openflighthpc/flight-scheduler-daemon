@@ -52,6 +52,7 @@ module FlightScheduler
         raise DuplicateJob, job_id
       end
       @jobs[job_id] = { job: job, runners: Concurrent::Hash.new, deallocated: false }
+      job.start_time_out_task
     end
 
     def add_runner(job_id, runner_id, runner)
