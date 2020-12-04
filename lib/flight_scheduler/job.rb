@@ -129,13 +129,23 @@ module FlightScheduler
         Async.logger.info "Job '#{id}' will start timing out in '#{@time_out}'"
         while FlightScheduler.app.job_registry.lookup_job(id)
           if @timed_out_time || time_out?
-            first = @timed_out_time ? false : true
-            @timed_out_time ||= Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i
+            if @timed_out_time
+              first = false
+            elsif File.exists? timed_out_path
+              Async.logger.debug "Resuming time out for job: #{id}"
+              @timed_out_time = File.read(timed_out_path).to_i
+              first = false
+            else
+              Async.logger.error "Job Timed Out: #{id}"
+              @timed_out_time = Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i
+              first = true
+            end
 
             if first
-              Async.logger.error "Job Timed Out: #{id}"
-              MessageSender.send(command: 'JOB_TIMED_OUT', job_id: id)
               send_signal("TERM")
+              File.write(timed_out_path, @timed_out_time)
+              MessageSender.send(command: 'JOB_TIMED_OUT', job_id: id)
+
               # Allow fast exiting runners to finalise quickly
               task.yield
             elsif (Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i - @timed_out_time) > 90
@@ -153,6 +163,10 @@ module FlightScheduler
           end
           task.sleep 5
         end
+
+        if @timed_out_time
+          Async.logger.debug "Finished time out handling for job: #{id}"
+        end
       end
     end
 
@@ -164,6 +178,10 @@ module FlightScheduler
     end
 
     private
+
+    def timed_out_path
+      dirname.join(dirname, 'timed_out').to_path
+    end
 
     def env_path
       dirname.join(dirname, 'environment').to_path
