@@ -73,8 +73,26 @@ module FlightScheduler
           Process::Sys.setuid(@job.username)
           Process.setsid
 
-          batchd = Batchd.new(@job, @script)
-          batchd.run
+          # We've inherited the running thread when we forked.  The runner
+          # thread contains a running `::Async::Reactor` which doesn't play
+          # nicely with `fork`.  We shut it down here and create a new thread
+          # so that we can safely start a new reactor.
+          #
+          # XXX This could all be avoided by execing into a new process here.
+          reactor = ::Async::Task.current.reactor
+          thread = Thread.new do
+            reactor.close
+            until reactor.closed?
+              sleep 0.1
+            end
+
+            # We can now safely run `Batchd` and it will be able to start the
+            # reactor that it needs.
+            batchd = Batchd.new(@job, @script)
+            batchd.run.wait
+          end
+          thread.join
+
         rescue
           Async.logger.warn("Error forking script runner") { $! }
           raise

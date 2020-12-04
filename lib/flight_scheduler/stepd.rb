@@ -37,13 +37,20 @@ module FlightScheduler
     end
 
     def run
-      run_step do |read, write, child_pid|
-        io_thread = connect_std_streams(read, write, child_pid)
-        notify_started
-        status = wait_for_child(child_pid, sleep_on_exit: !@step.pty?)
-        wait_for_connection
-        io_thread.kill
-        notify_finished(status)
+      Async do
+        with_controller_connection do |connection|
+          run_step do |read, write, child_pid|
+            io_thread = connect_std_streams(read, write, child_pid)
+            notify_started(connection)
+            status = wait_for_child(child_pid, sleep_on_exit: !@step.pty?)
+            wait_for_client_connection
+            io_thread.kill
+            notify_finished(status, connection)
+          end
+        end
+      rescue
+        Async.logger.warn { $! }
+        raise
       end
     end
 
@@ -106,7 +113,7 @@ module FlightScheduler
       status
     end
 
-    def wait_for_connection
+    def wait_for_client_connection
       # If we haven't yet received a connection, it may be because we're
       # running a very quick command, which doesn't produce enough output to
       # block on a full output pipe.  Examples are `hostname` or `date`.
@@ -208,18 +215,39 @@ module FlightScheduler
       end
     end
 
-    def notify_started
-      MessageSender.send({
+    def notify_started(connection)
+      connection.write({
         command: 'RUN_STEP_STARTED',
         job_id: @job.id,
         port: @port,
         step_id: @step.id,
       })
+      connection.flush
     end
 
-    def notify_finished(status)
+    def notify_finished(status, connection)
       command = status.success? ? 'RUN_STEP_COMPLETED' : 'RUN_STEP_FAILED'
-      MessageSender.send(command: command, job_id: @job.id, step_id: @step.id)
+      connection.write(command: command, job_id: @job.id, step_id: @step.id)
+      connection.flush
+    end
+
+    def with_controller_connection(&block)
+      controller_url = FlightScheduler.app.config.controller_url
+      endpoint = Async::HTTP::Endpoint.parse(controller_url)
+      auth_token = FlightScheduler::Auth.token
+
+      Async.logger.info("Connecting to #{controller_url.inspect}") { endpoint }
+      Async::WebSocket::Client.connect(endpoint) do |connection|
+        Async.logger.info("Connected to #{controller_url.inspect}")
+        @connection = connection
+        connection.write({
+          command: 'STEPD_CONNECTED',
+          auth_token: auth_token,
+          name: "#{@job.id}.#{@step.id}",
+        })
+        connection.flush
+        block.call(connection)
+      end
     end
   end
 end

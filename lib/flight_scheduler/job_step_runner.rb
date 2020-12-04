@@ -68,8 +68,29 @@ module FlightScheduler
           Process::Sys.setuid(@job.username)
           Process.setsid
 
-          stepd = Stepd.new(@job, @step)
-          stepd.run
+          # We've inherited the running thread when we forked.  The runner
+          # thread contains a running `::Async::Reactor` which doesn't play
+          # nicely with `fork`.  We shut it down here and create a new thread
+          # so that we can safely start a new reactor.
+          #
+          # XXX This could all be avoided by execing into a new process here.
+          reactor = ::Async::Task.current.reactor
+          thread = Thread.new do
+            reactor.close
+            until reactor.closed?
+              sleep 0.1
+            end
+
+            # We can now safely run `Stepd` and it will be able to start the
+            # reactor that it needs.
+            stepd = Stepd.new(@job, @step)
+            stepd.run.wait
+          end
+          thread.join
+
+        rescue
+          Async.logger.warn("Error forking script runner") { $! }
+          raise
         end
 
         # Loop asynchronously until the child is finished

@@ -25,6 +25,10 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
+require 'async'
+require 'async/http/endpoint'
+require 'async/websocket/client'
+
 module FlightScheduler
   class Batchd
     def initialize(job, script)
@@ -33,9 +37,16 @@ module FlightScheduler
     end
 
     def run
-      child_pid = run_script
-      status = wait_for_child(child_pid)
-      notify_finished(status)
+      Async do
+        with_connection do |connection|
+          child_pid = run_script
+          status = wait_for_child(child_pid)
+          notify_finished(status, connection)
+        end
+      rescue
+        Async.logger.warn { $! }
+        raise
+      end
     end
 
     private
@@ -43,7 +54,7 @@ module FlightScheduler
     def run_script
       FileUtils.mkdir_p(File.dirname(@script.stdout_path))
       FileUtils.mkdir_p(File.dirname(@script.stderr_path))
-      opts = { unsetenv_others: true }
+      opts = { unsetenv_others: true, close_others: true }
       if @script.stdout_path == @script.stderr_path
         opts.merge!({ [:out, :err] => @script.stdout_path })
       else
@@ -63,9 +74,29 @@ module FlightScheduler
       status
     end
 
-    def notify_finished(status)
+    def notify_finished(status, connection)
       command = status.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
-      MessageSender.send(command: command, job_id: @job.id)
+      connection.write(command: command, job_id: @job.id)
+      connection.flush
+    end
+
+    def with_connection(&block)
+      controller_url = FlightScheduler.app.config.controller_url
+      endpoint = Async::HTTP::Endpoint.parse(controller_url)
+      auth_token = FlightScheduler::Auth.token
+
+      Async.logger.info("Connecting to #{controller_url.inspect}") { endpoint }
+      Async::WebSocket::Client.connect(endpoint) do |connection|
+        Async.logger.info("Connected to #{controller_url.inspect}")
+        @connection = connection
+        connection.write({
+          command: 'BATCHD_CONNECTED',
+          auth_token: auth_token,
+          name: "#{@job.id}.BATCHD",
+        })
+        connection.flush
+        block.call(connection)
+      end
     end
   end
 end
