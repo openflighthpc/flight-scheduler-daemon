@@ -124,7 +124,7 @@ module FlightScheduler
 
     # Must be called after adding to the registry
     def start_time_out_task
-      return if [nil, 0].include? @time_out
+      return if @time_out.nil?
       Async do |task|
         Async.logger.info "Job '#{id}' will start timing out in '#{@time_out}'"
         while FlightScheduler.app.job_registry.lookup_job(id)
