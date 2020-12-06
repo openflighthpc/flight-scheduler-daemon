@@ -39,14 +39,16 @@ module FlightScheduler
         job_id    = message[:job_id]
         env       = message[:environment]
         username  = message[:username]
+        time_out  = message[:time_limit]
 
         Async.logger.debug("Environment: #{env.map { |k, v| "#{k}=#{v}" }.join("\n")}")
         begin
-          job = FlightScheduler::Job.new(job_id, env, username)
+          job = FlightScheduler::Job.new(job_id, env, username, time_out)
           if job.valid?
             job.write
             FlightScheduler.app.job_registry.add_job(job.id, job)
             FlightScheduler.app.job_registry.save
+
           else
             raise JobValidationError, <<~ERROR.chomp
               An unexpected error has occurred! The job does not appear to be

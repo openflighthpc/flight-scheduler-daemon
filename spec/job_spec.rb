@@ -32,9 +32,10 @@ RSpec.describe FlightScheduler::Job do
   let(:id) { SecureRandom.uuid }
   let(:env) { {} }
   let(:username) { Etc.getlogin }
+  let(:timeout) { 0 }
 
   subject do
-    described_class.new(id, env, username)
+    described_class.new(id, env, username, timeout)
   end
 
   it { should be_valid }
@@ -53,6 +54,12 @@ RSpec.describe FlightScheduler::Job do
 
   context 'with a username as the env' do
     let(:env) { 'username' }
+
+    it { should_not be_valid }
+  end
+
+  context 'with a negative timeout' do
+    let(:timeout) { -1 }
 
     it { should_not be_valid }
   end

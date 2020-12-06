@@ -59,7 +59,7 @@ module FlightScheduler
       File.expand_path(@stdout_path, job.home_dir)
     end
 
-    def stderr_path 
+    def stderr_path
       File.expand_path(@stderr_path, job.home_dir)
     end
 
@@ -68,12 +68,6 @@ module FlightScheduler
         FileUtils.mkdir_p(File.dirname(path))
         File.write(path, @script_body)
         FileUtils.chmod(0755, path)
-      end
-    end
-
-    def remove
-      Sync do
-        FileUtils.rm_rf(File.dirname(path))
       end
     end
   end

@@ -30,7 +30,7 @@ require 'securerandom'
 
 RSpec.describe FlightScheduler::BatchScript do
   let(:job) {
-    FlightScheduler::Job.new(SecureRandom.uuid, {}, Etc.getlogin)
+    FlightScheduler::Job.new(SecureRandom.uuid, {}, Etc.getlogin, 0)
   }
   let(:script_body) do
     <<~SCRIPT
