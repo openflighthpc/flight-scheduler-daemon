@@ -32,9 +32,10 @@ RSpec.describe FlightScheduler::Job do
   let(:id) { SecureRandom.uuid }
   let(:env) { {} }
   let(:username) { Etc.getlogin }
+  let(:timeout) { 0 }
 
   subject do
-    described_class.new(id, env, username)
+    described_class.new(id, env, username, timeout)
   end
 
   it { should be_valid }
