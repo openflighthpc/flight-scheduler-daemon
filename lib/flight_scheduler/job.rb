@@ -136,7 +136,7 @@ module FlightScheduler
               @timed_out_time = File.read(timed_out_path).to_i
               first = false
             else
-              Async.logger.error "Job Timed Out: #{id}"
+              Async.logger.info "Job Timed Out: #{id}"
               @timed_out_time = Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i
               first = true
             end
@@ -171,7 +171,7 @@ module FlightScheduler
     end
 
     def send_signal(sig)
-      Async.logger.warn "Sending #{sig} to job: #{id}"
+      Async.logger.info "Sending #{sig} to job: #{id}"
       FlightScheduler.app.job_registry.lookup_runners(id).each do |_, runner|
         runner.send_signal(sig)
       end
