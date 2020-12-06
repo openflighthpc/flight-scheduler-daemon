@@ -54,7 +54,7 @@ module FlightScheduler
       return false unless /\A[\w-]+\Z/.match? id
       return false unless env.is_a? Hash
       return false unless passwd
-      return false unless @time_out.nil? || (@time_out.is_a?(Integer) || @time_out >= 0)
+      return false unless @time_out.nil? || (@time_out.is_a?(Integer) && @time_out >= 0)
       true
     end
 

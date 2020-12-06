@@ -57,4 +57,10 @@ RSpec.describe FlightScheduler::Job do
 
     it { should_not be_valid }
   end
+
+  context 'with a negative timeout' do
+    let(:timeout) { -1 }
+
+    it { should_not be_valid }
+  end
 end
