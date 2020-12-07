@@ -39,7 +39,7 @@ module FlightScheduler
         merged = defaults.merge(from_config_file).merge(from_env_vars)
         Configuration.new.tap do |config|
           merged.each do |key, value|
-            config.send("#{key}=", value)
+            config.send("#{key}=", transform(key, value))
           end
         end
       rescue => e
@@ -78,6 +78,15 @@ module FlightScheduler
             end
           end
           accum
+        end
+      end
+
+      def transform(key, value)
+        config_definition = Configuration::ATTRIBUTES.detect { |h| h[:name] == key }
+        if config_definition[:transform]
+          config_definition[:transform].call(value)
+        else
+          value
         end
       end
     end

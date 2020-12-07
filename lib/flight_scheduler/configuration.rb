@@ -54,7 +54,8 @@ module FlightScheduler
       {
         name: :spool_dir,
         env_var: true,
-        default: ->(root) { root.join('var/spool') }
+        default: ->(root) { root.join('var/spool') },
+        transform: ->(dir) { Pathname.new(dir) },
       },
     ]
     attr_accessor(*ATTRIBUTES.map { |a| a[:name] })
