@@ -25,13 +25,15 @@
 # https://github.com/openflighthpc/flight-scheduler-daemon
 #==============================================================================
 
+require 'active_support/core_ext/hash/except'
+
 module FlightScheduler
   #
   # Process incoming messages and send responses.
   #
   class MessageProcessor
     def call(message)
-      Async.logger.info("Processing message #{message.inspect}")
+      Async.logger.info("Processing message #{sanitize_message(message).inspect}")
       command = message[:command]
       case command
 
@@ -144,12 +146,16 @@ module FlightScheduler
         end
 
       else
-        Async.logger.info("Unknown message #{message}")
+        Async.logger.info("Unknown message #{sanitize_message(message)}")
       end
       Async.logger.debug("Processed message #{message.inspect}")
     rescue
       Async.logger.warn("Error processing message #{$!.message}")
       Async.logger.debug $!.full_message
+    end
+
+    def sanitize_message(message)
+      message.except(:environment, :script)
     end
   end
 end

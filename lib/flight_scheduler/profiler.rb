@@ -44,14 +44,15 @@ module FlightScheduler
       if status.success?
         return out.chomp
       else
-        Async.logger.debug <<~DEBUG
-          An error occurred when running lshw -xml:
+        Async.logger.debug("An error occurred when running lshw -xml:") {
+          <<~DEBUG
           STATUS: #{status.exitstatus}
           STDOUT:
           #{out}
           STDERR:
           #{err}
-        DEBUG
+          DEBUG
+        }
         raise ProfilerError, <<~ERROR
           Failed to determine the hardware information
         ERROR
@@ -68,12 +69,13 @@ module FlightScheduler
     end
 
     def log
-      Async.logger.info <<~PROFILE
-        Profiler Results:
+      Async.logger.info("Profiler Results:") {
+        <<~PROFILE
         cpus:   #{cpus}
         gpus:   #{gpus}
         memory: #{memory}
-      PROFILE
+        PROFILE
+      }
     end
 
     # Currently assumes hyperthreading is the same as additional cores
