@@ -44,6 +44,11 @@
 # Default: The output from `hostname --short`.
 # node_name: 
 
+# The type of the node that is reported to the controller
+# Environment variable FLIGHT_SCHEDULER_NODE_TYPE takes precedence over this
+# setting. This config is optional and does not have a default.
+# node_type: 
+
 # Log level.
 # Environment variable FLIGHT_SCHEDULER_LOG_LEVEL takes precedence over this
 # setting.

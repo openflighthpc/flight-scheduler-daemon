@@ -72,7 +72,8 @@ module FlightScheduler
         auth_token: auth_token,
         cpus: profiler.cpus,
         gpus: profiler.gpus,
-        memory: profiler.memory
+        memory: profiler.memory,
+        type: FlightScheduler.app.config.node_type
       })
       con.flush
     end
