@@ -115,7 +115,9 @@ module FlightScheduler
           end
 
           # Wait for the runners to finish and remove the job
-          task.sleep(0.1) until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
+          until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
+            task.sleep FlightScheduler.app.config.generic_short_sleep
+          end
           FlightScheduler.app.job_registry.remove_job(job_id)
           FlightScheduler.app.job_registry.save
           MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
@@ -139,7 +141,9 @@ module FlightScheduler
             runner.cancel
           end
 
-          task.sleep(0.1) until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
+          until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
+            task.sleep FlightScheduler.app.config.generic_short_sleep
+          end
           FlightScheduler.app.job_registry.remove_job(job_id)
           FlightScheduler.app.job_registry.save
           MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)

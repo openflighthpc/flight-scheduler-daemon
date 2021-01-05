@@ -78,3 +78,15 @@
 # over this setting.
 # Default: 60
 # max_connection_sleep:
+
+# Generic sleep periods
+# The generic sleep period used to preform various checks. There are two
+# configurable sleep periods; a 'short' and 'long'. The 'long' period
+# should be on the order of many seconds. The 'short' period may be a
+# fraction of a second.
+# Environment variable FLIGHT_SCHEDULER_GENERIC_SHORT_SLEEP and
+# FLIGHT_SCHEDULER_GENERIC_LONG_SLEEP take precedence over these
+# settigns.
+# Defaults: 0.1 short/ 5 long
+# generic_short_sleep:
+# generic_long_sleep:

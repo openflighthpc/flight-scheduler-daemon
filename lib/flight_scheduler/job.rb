@@ -151,7 +151,7 @@ module FlightScheduler
             elsif (Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i - @timed_out_time) > 90
               send_signal("KILL")
               # Ensure slow exiting runners have finished
-              task.sleep 5
+              task.sleep FlightScheduler.app.config.generic_long_sleep
             end
 
             if FlightScheduler.app.job_registry.lookup_runners(id).empty?
@@ -161,7 +161,7 @@ module FlightScheduler
               MessageSender.send(command: 'NODE_DEALLOCATED', job_id: id)
             end
           end
-          task.sleep 5
+          task.sleep FlightScheduler.app.config.generic_long_sleep
         end
 
         if @timed_out_time
