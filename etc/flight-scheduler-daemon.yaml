@@ -69,3 +69,12 @@
 # Default: The relative directory ./var/spool/.  Relative to the root of
 # the flight scheduler installation.
 # spool_dir: './var/spool/'
+
+# Maximum Connection Sleep
+# The maximum wait time between failed attempts to connect to the controller.
+# A shorter period will be initially used before backing off to this period.
+# The time is given in seconds
+# Environment variable FLIGHT_SCHEDULER_MAX_CONNECTION_SLEEP takes precedence
+# over this setting.
+# Default: 60
+# max_connection_sleep:

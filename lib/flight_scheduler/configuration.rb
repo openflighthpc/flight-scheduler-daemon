@@ -74,7 +74,13 @@ module FlightScheduler
         env_var: true,
         default: 51000,
         transform: ->(int) { int.to_i }
-      }
+      },
+      {
+        name: :max_connection_sleep,
+        env_var: true,
+        default: 60,
+        transform: ->(int) { int.to_i }
+      },
     ]
     attr_accessor(*ATTRIBUTES.map { |a| a[:name] })
 

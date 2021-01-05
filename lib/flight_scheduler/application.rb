@@ -37,6 +37,7 @@ module FlightScheduler
 
     def initialize(job_registry:)
       @job_registry = job_registry
+      @connection_sleep = 1
     end
 
     def config
@@ -88,6 +89,7 @@ module FlightScheduler
           Async.logger.info("Connecting to #{controller_url.inspect}")
           Async::WebSocket::Client.connect(endpoint) do |connection|
             Async.logger.info("Connected to #{controller_url.inspect}")
+            @connection_sleep = 1
             @connection = connection
             processor = MessageProcessor.new
             send_connected(@connection)
@@ -99,8 +101,12 @@ module FlightScheduler
           end
         rescue EOFError, Errno::ECONNREFUSED
           Async.logger.info("Connection closed: #{$!.message}")
-          # XXX Incremental backoff.
-          sleep 1
+          sleep @connection_sleep
+          if @connection_sleep * 2 > FlightScheduler.app.config.max_connection_sleep
+            @connection_sleep = FlightScheduler.app.config.max_connection_sleep
+          else
+            @connection_sleep = @connection_sleep * 2
+          end
           retry
         end
       end
