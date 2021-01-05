@@ -73,6 +73,11 @@
 # Maximum Connection Sleep
 # The maximum wait time between failed attempts to connect to the controller.
 # A shorter period will be initially used before backing off to this period.
+#
+# It also controls how long a job step will wait for its client connection.
+# This connection does not have incremental backoff and the job step will be
+# exited after it elapses.
+#
 # The time is given in seconds
 # Environment variable FLIGHT_SCHEDULER_MAX_CONNECTION_SLEEP takes precedence
 # over this setting.

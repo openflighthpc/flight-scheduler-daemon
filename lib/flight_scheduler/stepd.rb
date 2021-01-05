@@ -110,7 +110,9 @@ module FlightScheduler
       if sleep_on_exit
         # FSR we need to sleep here to allow the output to be sent across the
         # network reliably.
-        sleep 0.1
+        # TODO: Investigate the reason for this sleep, does it need a
+        # tcp_socket.closed? check?
+        sleep FlightScheduler.app.config.generic_short_sleep
       end
       status
     end
@@ -124,14 +126,27 @@ module FlightScheduler
       # established.  If a connection is established we can assume that the
       # small amount of ouput is sent very quickly.
       #
-      # If we don't receive a connection within max_sleep seconds, we're
-      # unlikely to receive one at all.  The output will be lost.
-      max_sleep = 5
+      # NOTE: If we don't receive a connection within the maximum sleeping
+      # period, it is likely it will never be received. However in practice
+      # there are numerous situations where a timeout will occur prematurely.
+      # Possible sources of delays are:
+      # * When submitting the job step to another node(s),
+      # * When the client connecting to another node, or
+      # * During the clients long polling on job submission.
+      #
+      # Various small delays can build up, causing the connection to
+      # timeout. Consider refactoring so connections are only closed when
+      # they exit normally, are cancelled, the job/allocation timesout, or
+      # NODE_DEALLOCATED is received.
+      #
+      # This may cause issues with too many open files, however this is
+      # probably already possible. Consider implementing a job step limit.
+      max_sleep = FlightScheduler.app.config.max_connection_sleep
       current_sleep = 0
       unless @received_connection
         loop do
-          current_sleep += 0.1
-          sleep 0.1
+          current_sleep += FlightScheduler.app.config.generic_short_sleep
+          sleep FlightScheduler.app.config.generic_short_sleep
           if current_sleep >= max_sleep
             Async.logger.debug("No connection received. Giving up")
             break
@@ -139,7 +154,7 @@ module FlightScheduler
           if @received_connection
             # One additional sleep to make sure we have time to send all
             # output.
-            sleep 0.1
+            sleep FlightScheduler.app.config.generic_short_sleep
             break
           end
         end
