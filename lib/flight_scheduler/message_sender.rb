@@ -48,7 +48,7 @@ module FlightScheduler
         # Wait until a connection becomes available
         connection = nil
         until connection = FlightScheduler.app.connection
-          task.sleep(0.1)
+          task.sleep FlightScheduler.app.config.generic_short_sleep
         end
 
         # Send the message

@@ -83,7 +83,7 @@ module FlightScheduler
           thread = Thread.new do
             reactor.close
             until reactor.closed?
-              sleep 0.1
+              sleep FlightScheduler.app.config.generic_short_sleep
             end
 
             # We can now safely run `Batchd` and it will be able to start the
@@ -100,7 +100,7 @@ module FlightScheduler
 
         # Loop asynchronously until the child is finished
         until Process.wait2(@child_pid, Process::WNOHANG) do
-          task.sleep 1
+          task.sleep FlightScheduler.app.config.generic_long_sleep
         end
 
         # Reset the child_pid, this prevents cancel killing other processes
