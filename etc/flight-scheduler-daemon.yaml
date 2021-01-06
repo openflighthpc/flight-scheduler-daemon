@@ -38,16 +38,24 @@
 # Default: http://127.0.0.1:6307/v0/ws
 # controller_url: http://127.0.0.1:6307/v0/ws
 
+# The port range to start the Step Daemons on. Both the start and end port
+# should be specified. The maximum possible range is 1 to 65535.
+# Environment variables FLIGHT_SCHEDULER_STEPD_PORT_START and
+# FLIGHT_SCHEDULER_STEPD_PORT_END takes precedence over this setting.
+# Defualt (start): 50000, Default (end): 51000
+# stepd_port_start:
+# stepd_port_end:
+
 # The name of the node the daemon is running on.
 # Environment variable FLIGHT_SCHEDULER_NODE_NAME takes precedence over this
 # setting.
 # Default: The output from `hostname --short`.
-# node_name: 
+# node_name:
 
 # The type of the node that is reported to the controller
 # Environment variable FLIGHT_SCHEDULER_NODE_TYPE takes precedence over this
 # setting. This config is optional and does not have a default.
-# node_type: 
+# node_type:
 
 # Log level.
 # Environment variable FLIGHT_SCHEDULER_LOG_LEVEL takes precedence over this
