@@ -55,6 +55,7 @@ module FlightScheduler
           end
           accum
         end
+          .deep_transform_keys(&:to_s)
       end
 
       def from_config_file
@@ -79,10 +80,13 @@ module FlightScheduler
           end
           accum
         end
+          .deep_transform_keys(&:to_s)
       end
 
       def transform(key, value)
-        config_definition = Configuration::ATTRIBUTES.detect { |h| h[:name] == key }
+        config_definition = Configuration::ATTRIBUTES.detect do |h|
+          h[:name].to_s == key.to_s
+        end
         if config_definition[:transform]
           config_definition[:transform].call(value)
         else
