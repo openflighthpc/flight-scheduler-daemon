@@ -30,6 +30,8 @@ require 'pty'
 
 module FlightScheduler
   class Stepd
+    class ServerCreateError < StandardError; end
+
     def initialize(job, step)
       @job = job
       @step = step
@@ -144,8 +146,21 @@ module FlightScheduler
       end
     end
 
+    def create_tcp_server
+      # The range is shuffled to mitigate port collisions with existing stepd daemons
+      enum = (FlightScheduler.app.config.lower_ephemeral_port..FlightScheduler.app.config.upper_ephemeral_port)
+                .to_a.shuffle.each
+      begin
+        TCPServer.new('0.0.0.0', enum.next)
+      rescue Errno::EADDRINUSE
+        retry
+      rescue StopIteration
+        raise ServerCreateError, "Failed to create stepd server due to port exhaustion"
+      end
+    end
+
     def connect_std_streams(output_rd, input_wr, child_pid)
-      server = TCPServer.new('0.0.0.0', 0)
+      server = create_tcp_server
       @port = server.addr[1]
       Thread.new do
         output_thread = nil
