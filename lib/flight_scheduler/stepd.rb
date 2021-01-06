@@ -148,7 +148,7 @@ module FlightScheduler
 
     def create_tcp_server
       # The range is shuffled to mitigate port collisions with existing stepd daemons
-      enum = (FlightScheduler.app.config.lower_ephemeral_port..FlightScheduler.app.config.upper_ephemeral_port)
+      enum = (FlightScheduler.app.config.stepd_port_start..FlightScheduler.app.config.stepd_port_end)
                 .to_a.shuffle.each
       begin
         TCPServer.new('0.0.0.0', enum.next)

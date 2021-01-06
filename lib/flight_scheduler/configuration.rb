@@ -64,13 +64,13 @@ module FlightScheduler
         env_var: true
       },
       {
-        name: :lower_ephemeral_port,
+        name: :stepd_port_start,
         env_var: true,
         default: 50000,
         transform: ->(int) { int.to_i }
       },
       {
-        name: :upper_ephemeral_port,
+        name: :stepd_port_end,
         env_var: true,
         default: 51000,
         transform: ->(int) { int.to_i }
@@ -80,17 +80,17 @@ module FlightScheduler
 
     def self.load(root)
       Loader.new(root, root.join('etc/flight-scheduler-daemon.yaml')).load.tap do |config|
-        if config.lower_ephemeral_port < 1
-          raise ConfigError, "The 'lower_ephemeral_port' must be positive"
-        elsif config.upper_ephemeral_port < 1
-          raise ConfigError, "The 'upper_ephemeral_port' must be positive"
-        elsif config.lower_ephemeral_port > config.upper_ephemeral_port
+        if config.stepd_port_start < 1
+          raise ConfigError, "The 'stepd_port_start' must be positive"
+        elsif config.stepd_port_end < 1
+          raise ConfigError, "The 'stepd_port_end' must be positive"
+        elsif config.stepd_port_start > config.stepd_port_end
           # NOTE: Technically the lower an upper port could be the same
           # This is not recommended as it will only allow one Stepd process to run
           # However it is the user's responsibility to prevent port exhaustion
-          raise ConfigError, "The lower_ephemeral_port can not be greater than upper_ephemeral_port"
-        elsif config.upper_ephemeral_port > 65535
-          raise ConfigError, "The upper_ephemeral_port must be less than or equal to 65535"
+          raise ConfigError, "The stepd_port_start can not be greater than stepd_port_end"
+        elsif config.stepd_port_end > 65535
+          raise ConfigError, "The stepd_port_end must be less than or equal to 65535"
         end
       end
     end
