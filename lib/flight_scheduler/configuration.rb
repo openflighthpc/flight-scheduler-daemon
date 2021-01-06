@@ -30,6 +30,8 @@ module FlightScheduler
   class Configuration
     autoload(:Loader, 'flight_scheduler/configuration/loader')
 
+    class ConfigError < StandardError; end
+
     ATTRIBUTES = [
       {
         name: :auth_type,
@@ -60,12 +62,37 @@ module FlightScheduler
       {
         name: :node_type,
         env_var: true
+      },
+      {
+        name: :lower_ephemeral_port,
+        env_var: true,
+        default: 50000,
+        transform: ->(int) { int.to_i }
+      },
+      {
+        name: :upper_ephemeral_port,
+        env_var: true,
+        default: 51000,
+        transform: ->(int) { int.to_i }
       }
     ]
     attr_accessor(*ATTRIBUTES.map { |a| a[:name] })
 
     def self.load(root)
-      Loader.new(root, root.join('etc/flight-scheduler-daemon.yaml')).load
+      Loader.new(root, root.join('etc/flight-scheduler-daemon.yaml')).load.tap do |config|
+        if config.lower_ephemeral_port < 1
+          raise ConfigError, "The 'lower_ephemeral_port' must be positive"
+        elsif config.upper_ephemeral_port < 1
+          raise ConfigError, "The 'upper_ephemeral_port' must be positive"
+        elsif config.lower_ephemeral_port > config.upper_ephemeral_port
+          # NOTE: Technically the lower an upper port could be the same
+          # This is not recommended as it will only allow one Stepd process to run
+          # However it is the user's responsibility to prevent port exhaustion
+          raise ConfigError, "The lower_ephemeral_port can not be greater than upper_ephemeral_port"
+        elsif config.upper_ephemeral_port > 65535
+          raise ConfigError, "The upper_ephemeral_port must be less than or equal to 65535"
+        end
+      end
     end
 
     def log_level=(level)
