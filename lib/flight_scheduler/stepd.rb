@@ -126,21 +126,19 @@ module FlightScheduler
       # established.  If a connection is established we can assume that the
       # small amount of ouput is sent very quickly.
       #
-      # NOTE: If we don't receive a connection within the maximum sleeping
-      # period, it is likely it will never be received. However in practice
-      # there are numerous situations where a timeout will occur prematurely.
-      # Possible sources of delays are:
-      # * When submitting the job step to another node(s),
-      # * When the client connecting to another node, or
-      # * During the clients long polling on job submission.
+      # Until the connection is received, the pipe between "stepd" and the
+      # command being ran will not be read from.  Depending on the amount of
+      # ouput generated, this could cause the command to block.  If a
+      # connection is never received, such a blocked command will never
+      # complete potentially blocking this stepd program from exiting.
       #
-      # Various small delays can build up, causing the connection to
-      # timeout. Consider refactoring so connections are only closed when
-      # they exit normally, are cancelled, the job/allocation timesout, or
-      # NODE_DEALLOCATED is received.
+      # We workaround this issue by having a maximum amount of time that we
+      # are prepared to wait for the connection.  If the connection is not
+      # received within that time we abort.
       #
-      # This may cause issues with too many open files, however this is
-      # probably already possible. Consider implementing a job step limit.
+      # XXX Replace the "sleep and abort" workaround with a time limit for
+      # job steps, similar to the existing time limit for jobs.  Whilst
+      # ensuring that quick running commands still work.
       max_sleep = FlightScheduler.app.config.max_connection_sleep
       current_sleep = 0
       unless @received_connection
