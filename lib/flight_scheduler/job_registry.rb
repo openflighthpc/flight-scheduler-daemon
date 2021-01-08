@@ -47,12 +47,18 @@ module FlightScheduler
       @jobs = Concurrent::Hash.new
     end
 
-    def add_job(job_id, job)
+    def each_job
+      @jobs.each do |_, job|
+        yield job[:job] if block_given?
+      end
+    end
+
+    def add_job(job_id, job, start_timeout: true)
       if @jobs[job_id]
         raise DuplicateJob, job_id
       end
       @jobs[job_id] = { job: job, runners: Concurrent::Hash.new, deallocated: false }
-      job.start_time_out_task
+      job.start_time_out_task if start_timeout
     end
 
     def add_runner(job_id, runner_id, runner)
@@ -109,7 +115,7 @@ module FlightScheduler
       data.each do |hash|
         job = Job.from_serialized_hash(hash)
         if job.valid?
-          add_job(job.id, job)
+          add_job(job.id, job, start_timeout: false)
         else
           Async.logger.warn("Invalid job loaded: #{job.inspect}")
         end
