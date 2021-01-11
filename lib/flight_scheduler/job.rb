@@ -127,7 +127,7 @@ module FlightScheduler
       return if @time_out.nil?
       Async do |task|
         remaining_time = @time_out + @created_time - Process.clock_gettime(Process::CLOCK_MONOTONIC)
-        Async.logger.info "Job '#{id}' will start timing out in '#{remaining_time.to_i}'"
+        Async.logger.info "Job '#{id}' will start timing out in '#{remaining_time.to_i}' seconds"
         while FlightScheduler.app.job_registry.lookup_job(id)
           if @timed_out_time || time_out?
             if @timed_out_time
