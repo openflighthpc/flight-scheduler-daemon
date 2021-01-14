@@ -70,7 +70,7 @@ module FlightScheduler
       if serialized_env.nil?
         nil
       else
-        Hash[serialized_env.split("\0").map { |pairs| pairs.split('=', 2) }]
+        JSON.load(serialized_env)
       end
     end
 
@@ -99,8 +99,7 @@ module FlightScheduler
     def write
       Sync do
         FileUtils.mkdir_p(dirname)
-        serialized_env = adjusted_env.map { |k, v| "#{k}=#{v}" }.join("\0")
-        File.write(env_path, serialized_env)
+        File.write(env_path, JSON.dump(adjusted_env))
         # We don't want the env hanging around in memory.
         @env = nil
       end
@@ -185,7 +184,7 @@ module FlightScheduler
     end
 
     def env_path
-      dirname.join(dirname, 'environment').to_path
+      dirname.join(dirname, 'environment.json').to_path
     end
 
     def adjusted_env
