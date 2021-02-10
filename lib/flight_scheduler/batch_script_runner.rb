@@ -63,6 +63,9 @@ module FlightScheduler
           # Ignore SIGTERM in the parent. It has been sent to the children.
           trap('SIGTERM') {}
 
+          # Become the session leader
+          Process.setsid
+
           # We've inherited the running thread when we forked.  The runner
           # thread contains a running `::Async::Reactor` which doesn't play
           # nicely with `fork`.  We shut it down here and create a new thread
