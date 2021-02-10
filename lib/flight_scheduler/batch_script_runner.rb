@@ -76,10 +76,8 @@ module FlightScheduler
               sleep FlightScheduler.app.config.generic_short_sleep
             end
 
-            # We can now safely run `Batchd` and it will be able to start the
-            # reactor that it needs.
-            batchd = Batchd.new(@job)
-            batchd.run.wait
+            # Start the Jobd daemon
+            Jobd.new(@job).run.wait
           end
           thread.join
 

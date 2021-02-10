@@ -30,7 +30,7 @@ require 'async/http/endpoint'
 require 'async/websocket/client'
 
 module FlightScheduler
-  class Batchd
+  class Jobd
     def initialize(job)
       @job = job
       @deallocated = false
@@ -150,7 +150,7 @@ module FlightScheduler
         Async.logger.info("Connected to #{controller_url.inspect}")
         @connection = connection
         connection.write({
-          command: 'BATCHD_CONNECTED',
+          command: 'JOBD_CONNECTED',
           auth_token: auth_token,
           job_id: @job.id
         })
