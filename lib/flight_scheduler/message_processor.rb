@@ -82,32 +82,6 @@ module FlightScheduler
           MessageSender.send(command: 'RUN_STEP_FAILED', job_id: job_id, step_id: step_id)
         end
 
-      when 'JOB_CANCELLED'
-        job_id = message[:job_id]
-        Async.logger.info("Cancelling job:#{job_id}")
-
-        # Deallocate the job to prevent any further job steps
-        FlightScheduler.app.job_registry.deallocate_job(job_id)
-
-        Async do |task|
-          # Allow other tasks to run a final time before cancelling
-          # This is a last attempt to collect any finished processes
-          task.yield
-
-          # Cancel all current runners
-          FlightScheduler.app.job_registry.lookup_runners(job_id).each do |_, runner|
-            runner.cancel
-          end
-
-          # Wait for the runners to finish and remove the job
-          until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
-            task.sleep FlightScheduler.app.config.generic_short_sleep
-          end
-          FlightScheduler.app.job_registry.remove_job(job_id)
-          FlightScheduler.app.job_registry.save
-          MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
-        end
-
       when 'JOB_DEALLOCATED'
         job_id = message[:job_id]
         Async.logger.info("Deallocating job:#{job_id}")

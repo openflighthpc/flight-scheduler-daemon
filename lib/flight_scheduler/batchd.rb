@@ -33,6 +33,7 @@ module FlightScheduler
   class Batchd
     def initialize(job)
       @job = job
+      @deallocated = false
     end
 
     def run
@@ -44,9 +45,13 @@ module FlightScheduler
             case message[:command]
             when 'RUN_SCRIPT'
               run_script(message)
+            when 'JOB_CANCELLED'
+              job_cancelled
             else
               Async.logger.error("Unrecognised message: #{message[:command]}")
             end
+
+            Async.logger.info("Processed #{message[:command]}: jobd - #{@job.id}")
           end
         end
       rescue
@@ -91,15 +96,35 @@ module FlightScheduler
         Kernel.exec(@job.env, script.path, *script.arguments, **opts)
       end
 
-      # Wait for the process to finish
-      Async.logger.info("batchd: waiting on child_pid:#{@child_pid}")
-      _, status = Process.wait2(@child_pid)
-      Async.logger.debug("batchd: done waiting on child_pid:#{@child_pid}")
+      # Asynchronously wait for the process to finish
+      Async do |task|
+        Async.logger.info("batchd: waiting on child_pid:#{@child_pid}")
+        until out = Process.wait2(@child_pid, Process::WNOHANG)
+          task.sleep FlightScheduler.app.config.generic_long_sleep
+        end
+        Async.logger.debug("batchd: done waiting on child_pid:#{@child_pid}")
+        _, status = out
 
-      # Notify the controller the process has finished
-      command = status.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
-      @connection.write(command: command)
-      @connection.flush
+        # Notify the controller the process has finished
+        command = status.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
+        @connection.write(command: command)
+        @connection.flush
+      end
+    end
+
+    def job_cancelled
+      Async.logger.info("Cancelling job:#{@job.id}")
+
+      # Deallocate the job to prevent any further job steps
+      @deallocated = true
+
+      # TODO: Cancel all the existing runners!
+      # FlightScheduler.app.job_registry.lookup_runners(job_id).each do |_, runner|
+      #   runner.cancel
+      # end
+
+      # Terminate the batch script
+      send_signal('TERM')
     end
 
     def with_connection
@@ -124,6 +149,14 @@ module FlightScheduler
     ensure
       @connection.close if @connection && ! @connection.closed?
       @connection = nil
+    end
+
+    def send_signal(sig)
+      return unless @child_pid
+      Async.logger.debug "Sending #{sig} to Process Group #{@child_pid}"
+      Process.kill(-Signal.list[sig], @child_pid)
+    rescue Errno::ESRCH
+      # NOOP - Don't worry if the process has already finished
     end
   end
 end
