@@ -81,9 +81,6 @@ module FlightScheduler
 
     def run
       Async do |task|
-        # Starts all the pre-existing timeouts
-        job_registry.each_job(&:start_time_out_task)
-
         controller_url = FlightScheduler.app.config.controller_url
         endpoint = Async::HTTP::Endpoint.parse(controller_url)
         profiler.log

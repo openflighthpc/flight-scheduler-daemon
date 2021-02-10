@@ -39,9 +39,9 @@ module FlightScheduler
 
     def run
       Async do
-        # TODO: Rework timeout
-        # job.start_time_out_task
         with_connection do
+          start_time_out_task
+
           while message = @connection.read
             case message[:command]
             when 'RUN_SCRIPT'
@@ -168,6 +168,55 @@ module FlightScheduler
       Process.kill(-Signal.list[sig], @child_pid)
     rescue Errno::ESRCH
       # NOOP - Don't worry if the process has already finished
+    end
+
+    def running?
+      if send_signal('EXIT')
+        true
+      elsif @steps.any? { |s| s.send_signal('EXIT') }
+        true
+      else
+        false
+      end
+    end
+
+    def start_time_out_task
+      return if @job.time_out.nil?
+      Async do |task|
+        remaining_time = @job.time_out + @job.created_time - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        Async.logger.info "Job '#{@job.id}' will start timing out in '#{remaining_time.to_i}' seconds"
+        while !@job.time_out? || running?
+          if @timed_out_time || @job.time_out?
+            if @timed_out_time
+              first = false
+            else
+              Async.logger.info "Job Timed Out: #{@job.id}"
+              @timed_out_time = Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i
+              first = true
+            end
+
+            if first
+              send_signal("TERM")
+              @steps.each { |s| s.send_signal('TERM') }
+              @connection.write(command: 'JOB_TIMED_OUT')
+
+              # Allow fast exiting runners to finalise quickly
+              task.yield
+            elsif (Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i - @timed_out_time) > 90
+              send_signal("KILL")
+              @steps.each { |s| s.send_signal('KILL') }
+
+              # Ensure slow exiting runners have finished
+              task.sleep FlightScheduler.app.config.generic_long_sleep
+            end
+          end
+          task.sleep FlightScheduler.app.config.generic_long_sleep
+        end
+
+        if @timed_out_time
+          Async.logger.debug "Finished time out handling for job: #{@job.id}"
+        end
+      end
     end
   end
 end
