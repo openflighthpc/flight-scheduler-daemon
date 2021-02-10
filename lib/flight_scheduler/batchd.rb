@@ -34,6 +34,7 @@ module FlightScheduler
     def initialize(job)
       @job = job
       @deallocated = false
+      @steps = []
     end
 
     def run
@@ -45,6 +46,8 @@ module FlightScheduler
             case message[:command]
             when 'RUN_SCRIPT'
               run_script(message)
+            when 'RUN_STEP'
+              run_step(message)
             when 'JOB_CANCELLED'
               job_cancelled
             else
@@ -112,18 +115,26 @@ module FlightScheduler
       end
     end
 
+    def run_step(message)
+      arguments = message[:arguments]
+      env       = message[:environment]
+      path      = message[:path]
+      pty       = message[:pty]
+      step_id   = message[:step_id]
+
+      Async.logger.debug("Running step:#{step_id} for job:#{@job.id} path:#{path} arguments:#{arguments}")
+      step = JobStep.new(@job, step_id, path, arguments, pty, env)
+      @steps << JobStepRunner.new(step).run
+    end
+
     def job_cancelled
       Async.logger.info("Cancelling job:#{@job.id}")
 
       # Deallocate the job to prevent any further job steps
       @deallocated = true
 
-      # TODO: Cancel all the existing runners!
-      # FlightScheduler.app.job_registry.lookup_runners(job_id).each do |_, runner|
-      #   runner.cancel
-      # end
-
-      # Terminate the batch script
+      # Terminate the batch script and steps
+      @steps.each(&:cancel)
       send_signal('TERM')
     end
 

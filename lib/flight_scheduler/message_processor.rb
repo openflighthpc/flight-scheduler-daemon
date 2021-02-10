@@ -64,24 +64,6 @@ module FlightScheduler
           MessageSender.send(command: 'JOB_ALLOCATION_FAILED', job_id: job_id)
         end
 
-      when 'RUN_STEP'
-        arguments = message[:arguments]
-        env       = message[:environment]
-        job_id    = message[:job_id]
-        path      = message[:path]
-        pty       = message[:pty]
-        step_id   = message[:step_id]
-
-        Async.logger.debug("Running step:#{step_id} for job:#{job_id} path:#{path} arguments:#{arguments}")
-        begin
-          job = FlightScheduler.app.job_registry.lookup_job!(job_id)
-          step = JobStep.new(job, step_id, path, arguments, pty, env)
-          JobStepRunner.new(step).run
-        rescue
-          Async.logger.warn("Error running step:#{step_id} for job:#{job_id} #{$!.message}")
-          MessageSender.send(command: 'RUN_STEP_FAILED', job_id: job_id, step_id: step_id)
-        end
-
       when 'JOB_DEALLOCATED'
         job_id = message[:job_id]
         Async.logger.info("Deallocating job:#{job_id}")
