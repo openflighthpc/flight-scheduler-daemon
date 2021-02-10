@@ -28,4 +28,6 @@
 module FlightScheduler
   class BaseError < RuntimeError; end
   class JobValidationError < BaseError; end
+
+  class UnexpectedError < BaseError; end
 end

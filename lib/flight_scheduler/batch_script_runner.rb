@@ -34,9 +34,8 @@ module FlightScheduler
   #
   class BatchScriptRunner
 
-    def initialize(script)
-      @script = script
-      @job = @script.job
+    def initialize(job)
+      @job = job
     end
 
     # Run the given batch script in a subprocess and return an Async::Task.
@@ -50,9 +49,9 @@ module FlightScheduler
     #   task has completed, the subprocess has completed and is no longer in
     #   the job registry.
     def run
-      unless @script.valid?
+      unless @job.valid?
         raise JobValidationError, <<~ERROR.chomp
-          An unexpected error has occurred! The batch script does not appear
+          An unexpected error has occurred! The batch job does not appear
           to be in a valid state.
         ERROR
       end
@@ -63,15 +62,6 @@ module FlightScheduler
         @child_pid = Kernel.fork do
           # Ignore SIGTERM in the parent. It has been sent to the children.
           trap('SIGTERM') {}
-
-          # Write the script_body to disk before we switch user.  We can't
-          # assume that the new user can write to this directory.
-          @script.write
-
-          # Become the requested user and session leader
-          Process::Sys.setgid(@job.gid)
-          Process::Sys.setuid(@job.username)
-          Process.setsid
 
           # We've inherited the running thread when we forked.  The runner
           # thread contains a running `::Async::Reactor` which doesn't play
@@ -88,7 +78,7 @@ module FlightScheduler
 
             # We can now safely run `Batchd` and it will be able to start the
             # reactor that it needs.
-            batchd = Batchd.new(@job, @script)
+            batchd = Batchd.new(@job)
             batchd.run.wait
           end
           thread.join

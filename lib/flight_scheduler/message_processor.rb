@@ -50,8 +50,9 @@ module FlightScheduler
             job.write
             FlightScheduler.app.job_registry.add_job(job.id, job)
             FlightScheduler.app.job_registry.save
-            job.start_time_out_task
 
+            # Start the jobd process
+            FlightScheduler::BatchScriptRunner.new(job).run
           else
             raise JobValidationError, <<~ERROR.chomp
               An unexpected error has occurred! The job does not appear to be
@@ -61,23 +62,6 @@ module FlightScheduler
         rescue
           Async.logger.warn("Error configuring job #{job_id}") { $! }
           MessageSender.send(command: 'JOB_ALLOCATION_FAILED', job_id: job_id)
-        end
-
-      when 'RUN_SCRIPT'
-        arguments   = message[:arguments]
-        job_id      = message[:job_id]
-        script_body = message[:script]
-        stderr      = message[:stderr_path]
-        stdout      = message[:stdout_path]
-
-        Async.logger.debug("Running script for job:#{job_id} script:#{script_body} arguments:#{arguments}")
-        begin
-          job = FlightScheduler.app.job_registry.lookup_job(job_id)
-          script = BatchScript.new(job, script_body, arguments, stdout, stderr)
-          FlightScheduler::BatchScriptRunner.new(script).run
-        rescue
-          Async.logger.warn("Error running script job:#{job_id} #{$!.message}")
-          MessageSender.send(command: 'NODE_FAILED_JOB', job_id: job_id)
         end
 
       when 'RUN_STEP'
