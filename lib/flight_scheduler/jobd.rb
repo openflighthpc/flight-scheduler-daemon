@@ -35,35 +35,45 @@ module FlightScheduler
       @job = job
       @deallocated = false
       @steps = []
+      @connection_sleep = 1
     end
 
     def run
       Async do
+        # Terminate the job on SIGINT/ SIGTERM
         trap('SIGTERM') { job_terminated(130) }
         trap('SIGINT') { job_terminated(143) }
 
-        with_connection do
-          start_time_out_task
+        # Start the timeout
+        start_time_out_task
 
-          while message = @connection.read
-            case message[:command]
-            when 'RUN_SCRIPT'
-              run_script(message)
-            when 'RUN_STEP'
-              run_step(message)
-            when 'JOB_CANCELLED'
-              job_cancelled
-            else
-              Async.logger.error("Unrecognised message: #{message[:command]}")
-            end
+        loop do
+          # Exit the process loop once deallocated and finished
+          break if @deallocated && ! running?
 
-            Async.logger.info("Processed #{message[:command]}: jobd - #{@job.id}")
+          # Attempt to read the next message or re-run the loop
+          message = read_message
+          next if message.nil?
+
+          case message[:command]
+          when 'RUN_SCRIPT'
+            run_script(message)
+          when 'RUN_STEP'
+            run_step(message)
+          when 'JOB_CANCELLED'
+            job_cancelled
+          else
+            Async.logger.error("Unrecognised message: #{message[:command]}")
           end
+
+          Async.logger.info("Processed #{message[:command]}: jobd - #{@job.id}")
         end
       rescue
-        Async.logger.warn { $! }
+        Async.logger.warn("Error (jobd - #{@job.id}): ") { $! }
         raise
       end
+    ensure
+      @connection.close if @connection && ! @connection.closed?
     end
 
     private
@@ -113,8 +123,7 @@ module FlightScheduler
 
         # Notify the controller the process has finished
         command = status.success? ? 'NODE_COMPLETED_JOB' : 'NODE_FAILED_JOB'
-        @connection.write(command: command)
-        @connection.flush
+        send_message(command)
       end
     end
 
@@ -130,28 +139,65 @@ module FlightScheduler
       @steps << JobStepRunner.new(step).run
     end
 
-    def with_connection
-      raise UnexpectedError, 'a connection has already been established' if @connection
+    def read_message
+      if @connection.nil? || @connection.closed?
+        send_message('JOBD_CONNECTED')
+      end
+      @connection.read
+    end
 
-      controller_url = FlightScheduler.app.config.controller_url
-      endpoint = Async::HTTP::Endpoint.parse(controller_url)
-      auth_token = FlightScheduler::Auth.token
+    def send_message(command, **options)
+      # Establishes a connection if required
+      if @connection.nil? || @connection.closed?
+        controller_url = FlightScheduler.app.config.controller_url
+        auth_token = FlightScheduler::Auth.token
 
-      Async.logger.info("Connecting to #{controller_url.inspect}") { endpoint }
-      Async::WebSocket::Client.connect(endpoint) do |connection|
-        Async.logger.info("Connected to #{controller_url.inspect}")
-        @connection = connection
-        connection.write({
+        # Build the client connection
+        endpoint = Async::HTTP::Endpoint.parse(controller_url)
+        client = Async::WebSocket::Client.open(endpoint)
+        @connection = client.connect(endpoint.authority, endpoint.path)
+
+        # Write the connected message
+        @connection.write({
           command: 'JOBD_CONNECTED',
           auth_token: auth_token,
-          job_id: @job.id
+          job_id: @job.id,
+          reconnect: !@connection.nil?
         })
-        connection.flush
-        yield if block_given?
+        @connection.flush
       end
-    ensure
-      @connection.close if @connection && ! @connection.closed?
-      @connection = nil
+
+      # Reset the connection sleep
+      @connection_sleep = 1
+
+      # Send the message
+      # NOTE: Do not resend the connection message
+      unless command == 'JOBD_CONNECTED'
+        @connection.write({
+          command: command,
+          **options
+        })
+        @connection.flush
+      end
+    rescue
+      Async.logger.error("Failed to send '#{command}'! Retrying .... (jobd: #{@job.id})")
+      Async.logger.debug("Error:") { $!.message }
+
+      # Ensure the connection is closed
+      begin
+        @connection&.close
+      rescue
+        # NOOP
+      end
+
+      sleep @connection_sleep
+      if @connection_sleep * 2 > FlightScheduler.app.config.max_connection_sleep
+        @connection_sleep = FlightScheduler.app.config.max_connection_sleep
+      else
+        @connection_sleep = @connection_sleep * 2
+      end
+
+      retry
     end
 
     # Preform a graceful shutdown of Jobd
@@ -224,7 +270,7 @@ module FlightScheduler
             if first
               send_signal("TERM")
               @steps.each { |s| s.send_signal('TERM') }
-              @connection.write(command: 'JOB_TIMED_OUT')
+              send_message('JOB_TIMED_OUT')
 
               # Allow fast exiting runners to finalise quickly
               task.yield
