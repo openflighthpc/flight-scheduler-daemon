@@ -271,7 +271,8 @@ module FlightScheduler
         connection.write({
           command: 'STEPD_CONNECTED',
           auth_token: auth_token,
-          name: "#{@job.id}.#{@step.id}",
+          job_id: @job.id,
+          step_id: @step.id
         })
         connection.flush
         block.call(connection)
