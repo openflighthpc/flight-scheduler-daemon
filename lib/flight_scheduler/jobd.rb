@@ -155,6 +155,7 @@ module FlightScheduler
         # Build the client connection
         endpoint = Async::HTTP::Endpoint.parse(controller_url)
         client = Async::WebSocket::Client.open(endpoint)
+        reconnect = !@connection.nil?
         @connection = client.connect(endpoint.authority, endpoint.path)
 
         # Write the connected message
@@ -162,7 +163,7 @@ module FlightScheduler
           command: 'JOBD_CONNECTED',
           auth_token: auth_token,
           job_id: @job.id,
-          reconnect: !@connection.nil?
+          reconnect: reconnect
         })
         @connection.flush
       end
