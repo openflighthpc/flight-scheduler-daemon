@@ -39,6 +39,9 @@ module FlightScheduler
 
     def run
       Async do
+        trap('SIGTERM') { job_terminated(130) }
+        trap('SIGINT') { job_terminated(143) }
+
         with_connection do
           start_time_out_task
 
@@ -127,17 +130,6 @@ module FlightScheduler
       @steps << JobStepRunner.new(step).run
     end
 
-    def job_cancelled
-      Async.logger.info("Cancelling job:#{@job.id}")
-
-      # Deallocate the job to prevent any further job steps
-      @deallocated = true
-
-      # Terminate the batch script and steps
-      @steps.each(&:cancel)
-      send_signal('TERM')
-    end
-
     def with_connection
       raise UnexpectedError, 'a connection has already been established' if @connection
 
@@ -160,6 +152,40 @@ module FlightScheduler
     ensure
       @connection.close if @connection && ! @connection.closed?
       @connection = nil
+    end
+
+    # Preform a graceful shutdown of Jobd
+    def job_cancelled
+      Async.logger.info("Cancelling job:#{@job.id}")
+
+      # Deallocate the job to prevent any further job steps
+      @deallocated = true
+
+      # Terminate the batch script and steps
+      @steps.each(&:cancel)
+      send_signal('TERM')
+    end
+
+    # Preform a hard shutdown of Jobd
+    def job_terminated(exitcode)
+      Async.logger.info("Terminate job:#{@job.id}")
+
+      # Deallocate the job to prevent any further job steps
+      @deallocated = true
+
+      # Terminate the batch script and steps
+      @steps.each(&:cancel)
+      send_signal('TERM')
+
+      # Give the child and step process time to exit
+      sleep FlightScheduler.app.config.generic_long_sleep
+      if running?
+        sleep 90
+        send_signal('KILL')
+        @steps.each { |s| s.send_signal('KILL') }
+      end
+
+      exit exitcode
     end
 
     def send_signal(sig)
