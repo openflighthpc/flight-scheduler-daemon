@@ -71,9 +71,9 @@ module FlightScheduler
       rescue
         Async.logger.warn("Error (jobd - #{@job.id}): ") { $! }
         raise
+      ensure
+        @connection.close if @connection && ! @connection.closed?
       end
-    ensure
-      @connection.close if @connection && ! @connection.closed?
     end
 
     private
