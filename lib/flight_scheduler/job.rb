@@ -121,8 +121,6 @@ module FlightScheduler
       Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i > @created_time + @time_out
     end
 
-    # Must be called after adding to the registry
-
     def send_signal(sig)
       Async.logger.info "Sending #{sig} to job: #{id}"
       FlightScheduler.app.job_registry.lookup_runners(id).each do |_, runner|

@@ -29,21 +29,21 @@ require 'async'
 
 module FlightScheduler
   #
-  # Run the given batch script and save a reference to the child process in
-  # the job registry.
+  # Start a jobd process for the given job and save a reference to the child
+  # process in the job registry.
   #
-  class BatchScriptRunner
+  class JobdRunner
 
     def initialize(job)
       @job = job
     end
 
-    # Run the given batch script in a subprocess and return an Async::Task.
+    # Run a jobd process for the job in a subprocess and return an Async::Task.
     #
     # Invariants:
     #
-    # * Blocks until the job and script have been validated and recorded in
-    #   the job registry.
+    # * Blocks until the job has been validated and recorded in the job
+    # registry.
     #
     # * Returns an Async::Task that can be `wait`ed on.  When the returned
     #   task has completed, the subprocess has completed and is no longer in
@@ -51,8 +51,8 @@ module FlightScheduler
     def run
       unless @job.valid?
         raise JobValidationError, <<~ERROR.chomp
-          An unexpected error has occurred! The batch job does not appear
-          to be in a valid state.
+          An unexpected error has occurred! The job does not appear to be in a
+          valid state.
         ERROR
       end
 

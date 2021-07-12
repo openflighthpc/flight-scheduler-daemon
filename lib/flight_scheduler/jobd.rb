@@ -114,11 +114,11 @@ module FlightScheduler
 
       # Asynchronously wait for the process to finish
       Async do |task|
-        Async.logger.info("batchd: waiting on child_pid:#{@child_pid}")
+        Async.logger.info("jobd: waiting on child_pid:#{@child_pid}")
         until out = Process.wait2(@child_pid, Process::WNOHANG)
           task.sleep FlightScheduler.app.config.generic_long_sleep
         end
-        Async.logger.debug("batchd: done waiting on child_pid:#{@child_pid}")
+        Async.logger.debug("jobd: done waiting on child_pid:#{@child_pid}")
         _, status = out
 
         # Notify the controller the process has finished
@@ -244,6 +244,7 @@ module FlightScheduler
     end
 
     def running?
+      # EXIT is signal 0, which can be used to check if the process exists.
       if send_signal('EXIT')
         true
       elsif @steps.any? { |s| s.send_signal('EXIT') }

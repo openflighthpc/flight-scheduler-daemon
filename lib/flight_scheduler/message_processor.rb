@@ -52,7 +52,7 @@ module FlightScheduler
             FlightScheduler.app.job_registry.save
 
             # Start the jobd process
-            FlightScheduler::BatchScriptRunner.new(job).run
+            FlightScheduler::JobdRunner.new(job).run
           else
             raise JobValidationError, <<~ERROR.chomp
               An unexpected error has occurred! The job does not appear to be
