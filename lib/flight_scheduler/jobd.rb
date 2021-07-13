@@ -227,9 +227,11 @@ module FlightScheduler
       exit exitcode
     end
 
-    def send_signal(sig)
+    def send_signal(sig, log: true)
       return unless @child_pid
-      Async.logger.debug "[jobd] Sending #{sig} to process group #{@child_pid}"
+      if log
+        Async.logger.debug "[jobd] Sending #{sig} to process group #{@child_pid}"
+      end
       Process.kill(-Signal.list[sig], @child_pid)
     rescue Errno::ESRCH
       # NOOP - Don't worry if the process has already finished
@@ -237,9 +239,9 @@ module FlightScheduler
 
     def running?
       # EXIT is signal 0, which can be used to check if the process exists.
-      if send_signal('EXIT')
+      if send_signal('EXIT', log: false)
         true
-      elsif @steps.any? { |s| s.send_signal('EXIT') }
+      elsif @steps.any? { |s| s.send_signal('EXIT', log: false) }
         true
       else
         false
