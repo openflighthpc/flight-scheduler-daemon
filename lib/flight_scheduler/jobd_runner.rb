@@ -85,7 +85,7 @@ module FlightScheduler
           thread.join
 
         rescue
-          Async.logger.warn("Error forking script runner") { $! }
+          Async.logger.warn("[daemon] Error forking jobd") { $! }
           raise
         end
 
@@ -104,7 +104,7 @@ module FlightScheduler
 
     def send_signal(sig)
       return unless @child_pid
-      Async.logger.debug "Sending #{sig} to Process Group #{@child_pid}"
+      Async.logger.debug "[daemon] Sending #{sig} to process group #{@child_pid}"
       Process.kill(-Signal.list[sig], @child_pid)
     rescue Errno::ESRCH
       # NOOP - Don't worry if the process has already finished

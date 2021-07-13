@@ -51,7 +51,7 @@ module FlightScheduler
           end
         end
       rescue
-        Async.logger.warn { $! }
+        Async.logger.warn("[stepd] Error running stepd") { $! }
         raise
       end
     end
@@ -103,9 +103,9 @@ module FlightScheduler
     end
 
     def wait_for_child(child_pid, sleep_on_exit:)
-      Async.logger.info("stepd: waiting on child_pid:#{child_pid}")
+      Async.logger.info("[stepd] Waiting on child_pid:#{child_pid}")
       _, status = Process.wait2(child_pid)
-      Async.logger.debug("stepd: done waiting on child_pid:#{child_pid}")
+      Async.logger.debug("[stepd] Done waiting on child_pid:#{child_pid}")
 
       if sleep_on_exit
         # FSR we need to sleep here to allow the output to be sent across the
@@ -146,7 +146,7 @@ module FlightScheduler
           current_sleep += FlightScheduler.app.config.generic_short_sleep
           sleep FlightScheduler.app.config.generic_short_sleep
           if current_sleep >= max_sleep
-            Async.logger.debug("No connection received. Giving up")
+            Async.logger.debug("[stepd] No connection received. Giving up")
             break
           end
           if @received_connection
@@ -179,16 +179,16 @@ module FlightScheduler
         output_thread = nil
         input_thread = nil
         begin
-          Async.logger.info("stepd: listening on #{server.addr[2]}:#{server.addr[1]}")
+          Async.logger.info("[stepd] Listening on #{server.addr[2]}:#{server.addr[1]}")
           connection = server.accept
           @received_connection = true
-          Async.logger.info("stepd: received connection")
+          Async.logger.info("[stepd] Received connection")
           output_thread = create_output_thread(output_rd, connection)
           input_thread = create_input_thread(input_wr, connection)
           output_thread.join
           input_thread.join
         rescue
-          Async.logger.warn("stepd: Error running stepd #{$!.message} -- #{$!.class.name}")
+          Async.logger.warn("[stepd] error running stepd #{$!.message} -- #{$!.class.name}")
         ensure
           begin
             # We kill both the input and output threads.  We also join against
@@ -200,15 +200,15 @@ module FlightScheduler
             output_thread.join if output_thread
             input_thread.join if input_thread
             connection.close if connection
-            Async.logger.info("stepd: connection closed")
+            Async.logger.info("[stepd] Connection closed")
             begin
-              Async.logger.debug("stepd: killing child_pid:#{child_pid}")
+              Async.logger.debug("[stepd] Killing child_pid:#{child_pid}")
               Process.kill('SIGTERM', child_pid)
             rescue Errno::ESRCH
               # NOOP - Don't worry if the process has already finished
             end
           rescue
-            Async.logger.warn("stepd: Unexpected error when cleaning up #{$!.message}")
+            Async.logger.warn("[stepd] Unexpected error when cleaning up #{$!.message}")
           end
         end
       end
@@ -223,7 +223,7 @@ module FlightScheduler
           # If the process is exits, we end up here.  We close the output
           # pipe.
           output_rd.close_read unless output_rd.closed?
-          Async.logger.debug("stepd: output thread exited")
+          Async.logger.debug("[stepd] Output thread exited")
         end
       end
     end
@@ -238,7 +238,7 @@ module FlightScheduler
           # connection, we end up here.  We close the input pipe which may
           # cause the process to exit.
           input_wr.close_write unless input_wr.closed?
-          Async.logger.debug("stepd: input thread exited")
+          Async.logger.debug("[stepd] Input thread exited")
         end
       end
     end
@@ -264,9 +264,9 @@ module FlightScheduler
       endpoint = Async::HTTP::Endpoint.parse(controller_url)
       auth_token = FlightScheduler::Auth.token
 
-      Async.logger.info("Connecting to #{controller_url.inspect}") { endpoint }
+      Async.logger.info("[stepd] Connecting to #{controller_url.inspect}") { endpoint }
       Async::WebSocket::Client.connect(endpoint) do |connection|
-        Async.logger.info("Connected to #{controller_url.inspect}")
+        Async.logger.info("[stepd] Connected to #{controller_url.inspect}")
         @connection = connection
         connection.write({
           command: 'STEPD_CONNECTED',

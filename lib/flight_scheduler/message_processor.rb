@@ -33,7 +33,7 @@ module FlightScheduler
   #
   class MessageProcessor
     def call(message)
-      Async.logger.info("Processing message #{sanitize_message(message).inspect}")
+      Async.logger.info("[daemon] Processing message #{sanitize_message(message).inspect}")
       command = message[:command]
       case command
 
@@ -60,13 +60,13 @@ module FlightScheduler
             ERROR
           end
         rescue
-          Async.logger.warn("Error configuring job #{job_id}") { $! }
+          Async.logger.warn("[daemon] Error configuring job #{job_id}") { $! }
           MessageSender.send(command: 'JOB_ALLOCATION_FAILED', job_id: job_id)
         end
 
       when 'JOB_DEALLOCATED'
         job_id = message[:job_id]
-        Async.logger.info("Deallocating job:#{job_id}")
+        Async.logger.info("[daemon] Deallocating job:#{job_id}")
 
         # Deallocate the job to prevent any further job steps
         FlightScheduler.app.job_registry.deallocate_job(job_id)
@@ -91,11 +91,11 @@ module FlightScheduler
         end
 
       else
-        Async.logger.info("Unknown message #{sanitize_message(message)}")
+        Async.logger.info("[daemon] Unknown message #{sanitize_message(message)}")
       end
-      Async.logger.debug("Processed message #{message.inspect}")
+      Async.logger.debug("[daemon] Processed message #{message.inspect}")
     rescue
-      Async.logger.warn("Error processing message #{$!.message}")
+      Async.logger.warn("[daemon] Error processing message #{$!.message}")
       Async.logger.debug $!.full_message
     end
 

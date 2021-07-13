@@ -63,13 +63,13 @@ module FlightScheduler
           when 'JOB_CANCELLED'
             job_cancelled
           else
-            Async.logger.error("Unrecognised message: #{message[:command]}")
+            Async.logger.error("[jobd] Unrecognised message: #{message[:command]}")
           end
 
-          Async.logger.info("Processed #{message[:command]}: jobd - #{@job.id}")
+          Async.logger.info("[jobd] Processed #{message[:command]}: job:#{@job.id}")
         end
       rescue
-        Async.logger.warn("Error (jobd - #{@job.id}): ") { $! }
+        Async.logger.warn("[jobd] Error (job:#{@job.id})") { $! }
         raise
       ensure
         @connection.close if @connection && ! @connection.closed?
@@ -114,11 +114,11 @@ module FlightScheduler
 
       # Asynchronously wait for the process to finish
       Async do |task|
-        Async.logger.info("jobd: waiting on child_pid:#{@child_pid}")
+        Async.logger.info("[jobd] Waiting on child_pid:#{@child_pid}")
         until out = Process.wait2(@child_pid, Process::WNOHANG)
           task.sleep FlightScheduler.app.config.generic_long_sleep
         end
-        Async.logger.debug("jobd: done waiting on child_pid:#{@child_pid}")
+        Async.logger.debug("[jobd] Done waiting on child_pid:#{@child_pid}")
         _, status = out
 
         # Notify the controller the process has finished
@@ -134,7 +134,7 @@ module FlightScheduler
       pty       = message[:pty]
       step_id   = message[:step_id]
 
-      Async.logger.debug("Running step:#{step_id} for job:#{@job.id} path:#{path} arguments:#{arguments}")
+      Async.logger.debug("[jobd] Running step:#{step_id} job:#{@job.id} path:#{path} arguments:#{arguments}")
       step = JobStep.new(@job, step_id, path, arguments, pty, env)
       @steps << JobStepRunner.new(step).run
     end
@@ -181,8 +181,8 @@ module FlightScheduler
         @connection.flush
       end
     rescue
-      Async.logger.error("Failed to send '#{command}'! Retrying .... (jobd: #{@job.id})")
-      Async.logger.debug("Error:") { $!.message }
+      Async.logger.error("[jobd] Failed to send '#{command}'! Retrying .... (job:#{@job.id})")
+      Async.logger.debug("[jobd] Error") { $!.message }
 
       # Ensure the connection is closed
       begin
@@ -203,7 +203,7 @@ module FlightScheduler
 
     # Preform a graceful shutdown of Jobd
     def job_cancelled
-      Async.logger.info("Cancelling job:#{@job.id}")
+      Async.logger.info("[jobd] Cancelling job:#{@job.id}")
 
       # Deallocate the job to prevent any further job steps
       @deallocated = true
@@ -215,7 +215,7 @@ module FlightScheduler
 
     # Preform a hard shutdown of Jobd
     def job_terminated(exitcode)
-      Async.logger.info("Terminate job:#{@job.id}")
+      Async.logger.info("[jobd] Terminate job:#{@job.id}")
 
       # Deallocate the job to prevent any further job steps
       @deallocated = true
@@ -237,7 +237,7 @@ module FlightScheduler
 
     def send_signal(sig)
       return unless @child_pid
-      Async.logger.debug "Sending #{sig} to Process Group #{@child_pid}"
+      Async.logger.debug "[jobd] Sending #{sig} to process group #{@child_pid}"
       Process.kill(-Signal.list[sig], @child_pid)
     rescue Errno::ESRCH
       # NOOP - Don't worry if the process has already finished
@@ -258,13 +258,13 @@ module FlightScheduler
       return if @job.time_out.nil?
       Async do |task|
         remaining_time = @job.time_out + @job.created_time - Process.clock_gettime(Process::CLOCK_MONOTONIC)
-        Async.logger.info "Job '#{@job.id}' will start timing out in '#{remaining_time.to_i}' seconds"
+        Async.logger.info "[jobd] Timeout job:#{@job.id} in #{remaining_time.to_i} seconds"
         while !@job.time_out? || running?
           if @timed_out_time || @job.time_out?
             if @timed_out_time
               first = false
             else
-              Async.logger.info "Job Timed Out: #{@job.id}"
+              Async.logger.info "[jobd] Job timed out. job:#{@job.id}"
               @timed_out_time = Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i
               first = true
             end
@@ -288,7 +288,7 @@ module FlightScheduler
         end
 
         if @timed_out_time
-          Async.logger.debug "Finished time out handling for job: #{@job.id}"
+          Async.logger.debug "[jobd] Finished time out handling for job: #{@job.id}"
         end
       end
     end
