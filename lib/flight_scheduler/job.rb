@@ -121,13 +121,6 @@ module FlightScheduler
       Process.clock_gettime(Process::CLOCK_MONOTONIC).to_i > @created_time + @time_out
     end
 
-    def send_signal(sig)
-      Async.logger.info "Sending #{sig} to job: #{id}"
-      FlightScheduler.app.job_registry.lookup_runners(id).each do |_, runner|
-        runner.send_signal(sig)
-      end
-    end
-
     private
 
     def env_path
