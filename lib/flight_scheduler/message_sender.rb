@@ -28,12 +28,14 @@
 module FlightScheduler
   class MessageSender
     def self.send(**opts)
-      new(**opts).tap(&:write)
+      connection_retriever = FlightScheduler.app.method(:connection)
+      new(connection_retriever, **opts).tap(&:write)
     end
 
     attr_reader :opts, :task
 
-    def initialize(**opts)
+    def initialize(connection_retriever, **opts)
+      @connection_retriever = connection_retriever
       @opts = opts
     end
 
@@ -47,14 +49,11 @@ module FlightScheduler
 
         # Wait until a connection becomes available
         connection = nil
-        until connection = FlightScheduler.app.connection
+        until connection = @connection_retriever.call
           task.sleep FlightScheduler.app.config.generic_short_sleep
         end
 
-        # Send the message
         connection.write(**opts)
-
-        # Flush the message
         connection.flush
       end
     end
