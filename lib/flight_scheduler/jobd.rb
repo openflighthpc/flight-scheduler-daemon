@@ -136,7 +136,7 @@ module FlightScheduler
 
       Async.logger.debug("[jobd] Running step:#{step_id} job:#{@job.id} path:#{path} arguments:#{arguments}")
       step = JobStep.new(@job, step_id, path, arguments, pty, env)
-      @steps << JobStepRunner.new(step).run
+      @steps << JobStepRunner.new(step).tap(&:run)
     end
 
     def read_message
