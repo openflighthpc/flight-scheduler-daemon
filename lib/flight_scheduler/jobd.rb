@@ -140,57 +140,38 @@ module FlightScheduler
     end
 
     def read_message
-      if @connection.nil? || @connection.closed?
-        send_message('JOBD_CONNECTED')
+      Async.logger.debug("[jobd] Reading next message")
+      with_controller_connection do |connection|
+        connection.read
       end
-      @connection.read
     end
 
-    def send_message(command, **options)
-      # Establishes a connection if required
-      if @connection.nil? || @connection.closed?
+    def with_controller_connection(&block)
+      if !@connection.nil? && !@connection.closed?
+        block.call(@connection)
+      else
         controller_url = FlightScheduler.app.config.controller_url
         auth_token = FlightScheduler::Auth.token
-
-        # Build the client connection
         endpoint = Async::HTTP::Endpoint.parse(controller_url)
+        Async.logger.info("[jobd] Connecting to #{controller_url.inspect}") { endpoint }
         client = Async::WebSocket::Client.open(endpoint)
-        reconnect = !@connection.nil?
+        reconnecting = !@connection.nil?
         @connection = client.connect(endpoint.authority, endpoint.path)
-
-        # Write the connected message
+        Async.logger.info("[jobd] Connected to #{controller_url.inspect}")
+        @connection_sleep = 1
         @connection.write({
           command: 'JOBD_CONNECTED',
           auth_token: auth_token,
           job_id: @job.id,
-          reconnect: reconnect
+          reconnect: reconnecting,
         })
         @connection.flush
-      end
-
-      # Reset the connection sleep
-      @connection_sleep = 1
-
-      # Send the message
-      # NOTE: Do not resend the connection message
-      unless command == 'JOBD_CONNECTED'
-        @connection.write({
-          command: command,
-          **options
-        })
-        @connection.flush
+        block.call(@connection)
       end
     rescue
-      Async.logger.error("[jobd] Failed to send '#{command}'! Retrying .... (job:#{@job.id})")
-      Async.logger.debug("[jobd] Error") { $!.message }
+      Async.logger.error("[jobd] Error communicating with controller. Retrying... (job:#{@job.id})") { $!.message }
 
-      # Ensure the connection is closed
-      begin
-        @connection&.close
-      rescue
-        # NOOP
-      end
-
+      @connection&.close rescue nil
       sleep @connection_sleep
       if @connection_sleep * 2 > FlightScheduler.app.config.max_connection_sleep
         @connection_sleep = FlightScheduler.app.config.max_connection_sleep
@@ -199,6 +180,17 @@ module FlightScheduler
       end
 
       retry
+    end
+
+    # Sends a message to the controller.  If the message cannot be sent, it
+    # blocks and keeps trying until the job times out or the message is
+    # successfully sent.
+    def send_message(command, **options)
+      Async.logger.debug("[jobd] Sending message #{command.inspect}")
+      with_controller_connection do |connection|
+        connection.write({ command: command, **options })
+        connection.flush
+      end
     end
 
     # Preform a graceful shutdown of Jobd
