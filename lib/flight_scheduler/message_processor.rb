@@ -33,7 +33,7 @@ module FlightScheduler
   #
   class MessageProcessor
     def call(message)
-      Async.logger.info("Processing message #{sanitize_message(message).inspect}")
+      Async.logger.info("[daemon] Processing message #{sanitize_message(message).inspect}")
       command = message[:command]
       case command
 
@@ -50,8 +50,9 @@ module FlightScheduler
             job.write
             FlightScheduler.app.job_registry.add_job(job.id, job)
             FlightScheduler.app.job_registry.save
-            job.start_time_out_task
 
+            # Start the jobd process
+            FlightScheduler::JobdRunner.new(job).run
           else
             raise JobValidationError, <<~ERROR.chomp
               An unexpected error has occurred! The job does not appear to be
@@ -59,74 +60,13 @@ module FlightScheduler
             ERROR
           end
         rescue
-          Async.logger.warn("Error configuring job #{job_id}") { $! }
+          Async.logger.warn("[daemon] Error configuring job #{job_id}") { $! }
           MessageSender.send(command: 'JOB_ALLOCATION_FAILED', job_id: job_id)
-        end
-
-      when 'RUN_SCRIPT'
-        arguments   = message[:arguments]
-        job_id      = message[:job_id]
-        script_body = message[:script]
-        stderr      = message[:stderr_path]
-        stdout      = message[:stdout_path]
-
-        Async.logger.debug("Running script for job:#{job_id} script:#{script_body} arguments:#{arguments}")
-        begin
-          job = FlightScheduler.app.job_registry.lookup_job(job_id)
-          script = BatchScript.new(job, script_body, arguments, stdout, stderr)
-          FlightScheduler::BatchScriptRunner.new(script).run
-        rescue
-          Async.logger.warn("Error running script job:#{job_id} #{$!.message}")
-          MessageSender.send(command: 'NODE_FAILED_JOB', job_id: job_id)
-        end
-
-      when 'RUN_STEP'
-        arguments = message[:arguments]
-        env       = message[:environment]
-        job_id    = message[:job_id]
-        path      = message[:path]
-        pty       = message[:pty]
-        step_id   = message[:step_id]
-
-        Async.logger.debug("Running step:#{step_id} for job:#{job_id} path:#{path} arguments:#{arguments}")
-        begin
-          job = FlightScheduler.app.job_registry.lookup_job!(job_id)
-          step = JobStep.new(job, step_id, path, arguments, pty, env)
-          JobStepRunner.new(step).run
-        rescue
-          Async.logger.warn("Error running step:#{step_id} for job:#{job_id} #{$!.message}")
-          MessageSender.send(command: 'RUN_STEP_FAILED', job_id: job_id, step_id: step_id)
-        end
-
-      when 'JOB_CANCELLED'
-        job_id = message[:job_id]
-        Async.logger.info("Cancelling job:#{job_id}")
-
-        # Deallocate the job to prevent any further job steps
-        FlightScheduler.app.job_registry.deallocate_job(job_id)
-
-        Async do |task|
-          # Allow other tasks to run a final time before cancelling
-          # This is a last attempt to collect any finished processes
-          task.yield
-
-          # Cancel all current runners
-          FlightScheduler.app.job_registry.lookup_runners(job_id).each do |_, runner|
-            runner.cancel
-          end
-
-          # Wait for the runners to finish and remove the job
-          until FlightScheduler.app.job_registry.lookup_runners(job_id).empty?
-            task.sleep FlightScheduler.app.config.generic_short_sleep
-          end
-          FlightScheduler.app.job_registry.remove_job(job_id)
-          FlightScheduler.app.job_registry.save
-          MessageSender.send(command: 'NODE_DEALLOCATED', job_id: job_id)
         end
 
       when 'JOB_DEALLOCATED'
         job_id = message[:job_id]
-        Async.logger.info("Deallocating job:#{job_id}")
+        Async.logger.info("[daemon] Deallocating job:#{job_id}")
 
         # Deallocate the job to prevent any further job steps
         FlightScheduler.app.job_registry.deallocate_job(job_id)
@@ -151,11 +91,11 @@ module FlightScheduler
         end
 
       else
-        Async.logger.info("Unknown message #{sanitize_message(message)}")
+        Async.logger.info("[daemon] Unknown message #{sanitize_message(message)}")
       end
-      Async.logger.debug("Processed message #{message.inspect}")
+      Async.logger.debug("[daemon] Processed message #{message.inspect}")
     rescue
-      Async.logger.warn("Error processing message #{$!.message}")
+      Async.logger.warn("[daemon] Error processing message #{$!.message}")
       Async.logger.debug $!.full_message
     end
 

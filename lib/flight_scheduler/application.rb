@@ -81,17 +81,14 @@ module FlightScheduler
 
     def run
       Async do |task|
-        # Starts all the pre-existing timeouts
-        job_registry.each_job(&:start_time_out_task)
-
         controller_url = FlightScheduler.app.config.controller_url
         endpoint = Async::HTTP::Endpoint.parse(controller_url)
         profiler.log
 
         loop do
-          Async.logger.info("Connecting to #{controller_url.inspect}")
+          Async.logger.info("[daemon] Connecting to #{controller_url.inspect}")
           Async::WebSocket::Client.connect(endpoint) do |connection|
-            Async.logger.info("Connected to #{controller_url.inspect}")
+            Async.logger.info("[daemon] Connected to #{controller_url.inspect}")
             @connection_sleep = 1
             @connection = connection
             processor = MessageProcessor.new
@@ -100,10 +97,10 @@ module FlightScheduler
               processor.call(message)
             end
             connection.close
-            Async.logger.info("Connection closed")
+            Async.logger.info("[daemon] Connection closed")
           end
         rescue EOFError, Errno::ECONNREFUSED
-          Async.logger.info("Connection closed: #{$!.message}")
+          Async.logger.info("[daemon] Connection closed: #{$!.message}")
           sleep @connection_sleep
           if @connection_sleep * 2 > FlightScheduler.app.config.max_connection_sleep
             @connection_sleep = FlightScheduler.app.config.max_connection_sleep

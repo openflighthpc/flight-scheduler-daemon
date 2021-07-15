@@ -29,31 +29,30 @@ require 'async'
 
 module FlightScheduler
   #
-  # Run the given batch script and save a reference to the child process in
-  # the job registry.
+  # Start a jobd process for the given job and save a reference to the child
+  # process in the job registry.
   #
-  class BatchScriptRunner
+  class JobdRunner
 
-    def initialize(script)
-      @script = script
-      @job = @script.job
+    def initialize(job)
+      @job = job
     end
 
-    # Run the given batch script in a subprocess and return an Async::Task.
+    # Run a jobd process for the job in a subprocess and return an Async::Task.
     #
     # Invariants:
     #
-    # * Blocks until the job and script have been validated and recorded in
-    #   the job registry.
+    # * Blocks until the job has been validated and recorded in the job
+    # registry.
     #
     # * Returns an Async::Task that can be `wait`ed on.  When the returned
     #   task has completed, the subprocess has completed and is no longer in
     #   the job registry.
     def run
-      unless @script.valid?
+      unless @job.valid?
         raise JobValidationError, <<~ERROR.chomp
-          An unexpected error has occurred! The batch script does not appear
-          to be in a valid state.
+          An unexpected error has occurred! The job does not appear to be in a
+          valid state.
         ERROR
       end
 
@@ -64,13 +63,7 @@ module FlightScheduler
           # Ignore SIGTERM in the parent. It has been sent to the children.
           trap('SIGTERM') {}
 
-          # Write the script_body to disk before we switch user.  We can't
-          # assume that the new user can write to this directory.
-          @script.write
-
-          # Become the requested user and session leader
-          Process::Sys.setgid(@job.gid)
-          Process::Sys.setuid(@job.username)
+          # Become the session leader
           Process.setsid
 
           # We've inherited the running thread when we forked.  The runner
@@ -86,15 +79,13 @@ module FlightScheduler
               sleep FlightScheduler.app.config.generic_short_sleep
             end
 
-            # We can now safely run `Batchd` and it will be able to start the
-            # reactor that it needs.
-            batchd = Batchd.new(@job, @script)
-            batchd.run.wait
+            # Start the Jobd daemon
+            Jobd.new(@job).run.wait
           end
           thread.join
 
         rescue
-          Async.logger.warn("Error forking script runner") { $! }
+          Async.logger.warn("[daemon] Error forking jobd") { $! }
           raise
         end
 
@@ -113,7 +104,7 @@ module FlightScheduler
 
     def send_signal(sig)
       return unless @child_pid
-      Async.logger.debug "Sending #{sig} to Process Group #{@child_pid}"
+      Async.logger.debug "[daemon] Sending #{sig} to process group #{@child_pid}"
       Process.kill(-Signal.list[sig], @child_pid)
     rescue Errno::ESRCH
       # NOOP - Don't worry if the process has already finished
